@@ -65,7 +65,7 @@ export const AuditTrailView: React.FC<AuditTrailViewProps> = ({ logs }) => {
                 </div>
 
                 <p className="text-xs text-slate-700 mt-1 leading-relaxed">
-                  {log.details}
+                  {typeof log.details === 'string' ? log.details : JSON.stringify(log.details)}
                 </p>
 
                 <div className="mt-2 flex items-center gap-2 text-[11px] text-slate-500 font-mono">

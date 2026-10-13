@@ -1,4 +1,82 @@
-export type UserRole = 'patient' | 'doctor' | 'coordinator';
+export type UserRole = 'patient' | 'doctor' | 'coordinator' | 'admin';
+export type UserStatus = 'active' | 'pending' | 'rejected' | 'suspended';
+
+export interface Profile {
+  id: string;
+  role: UserRole;
+  status: UserStatus;
+  full_name: string;
+  email: string | null;
+  phone: string | null;
+  avatar_url?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface PatientProfile {
+  id: string;
+  mrn?: string;
+  date_of_birth: string;
+  gender: 'Male' | 'Female' | 'Other' | 'Prefer not to say';
+  blood_group?: string;
+  street_address?: string;
+  city?: string;
+  state?: string;
+  postal_code?: string;
+  emergency_contact_name: string;
+  emergency_contact_relationship: string;
+  emergency_contact_phone: string;
+  primary_diagnosis?: string;
+  assigned_doctor_id?: string;
+  assigned_coordinator_id?: string;
+  consent_terms: boolean;
+  consent_privacy: boolean;
+  consent_data_processing: boolean;
+  consent_timestamp?: string;
+  created_at?: string;
+}
+
+export interface DoctorProfile {
+  id: string;
+  medical_license_number: string;
+  specialization: string;
+  hospital_department: string;
+  years_of_experience?: number;
+  approved_at?: string | null;
+  approved_by?: string | null;
+  rejection_reason?: string | null;
+  created_at?: string;
+}
+
+export interface CoordinatorProfile {
+  id: string;
+  department: string;
+  organization: string;
+  approved_at?: string | null;
+  approved_by?: string | null;
+  rejection_reason?: string | null;
+  created_at?: string;
+}
+
+export interface StaffApprovalItem {
+  id: string;
+  role: 'doctor' | 'coordinator';
+  status: UserStatus;
+  full_name: string;
+  email: string;
+  phone: string | null;
+  created_at: string;
+  doctor_details?: DoctorProfile;
+  coordinator_details?: CoordinatorProfile;
+}
+
+export interface AdminStats {
+  totalPendingApprovals: number;
+  totalDoctors: number;
+  totalCoordinators: number;
+  totalPatients: number;
+  totalStaff: number;
+}
 
 export type TaskStatus = 'Pending' | 'In Progress' | 'Overdue' | 'Verified' | 'Resolved';
 
@@ -160,16 +238,17 @@ export interface NotificationItem {
 
 export interface AuditLog {
   id: string;
-  actorId: string;
+  actorId?: string | null;
   actorName: string;
-  actorRole: UserRole;
-  entityType: 'CarePlan' | 'CareTask' | 'Report' | 'Review';
+  actorRole: string;
+  actorEmail?: string | null;
+  entityType: string;
   entityId: string;
   action: string;
-  previousState: string;
-  newState: string;
+  previousState?: string;
+  newState?: string;
   timestamp: string;
-  details: string;
+  details: string | Record<string, any>;
 }
 
 export interface DashboardStats {
