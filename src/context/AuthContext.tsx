@@ -1,4 +1,11 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useCallback,
+} from 'react';
 import type { User, Session } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import type { Profile } from '../lib/types';
@@ -17,84 +24,145 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [isAdminOtpVerified, setIsAdminOtpVerified] = useState<boolean>(() => {
-    return sessionStorage.getItem('careloop_admin_otp_verified') === 'true';
-  });
+  const [isLoading, setIsLoading] = useState(true);
+  const [isAdminOtpVerified, setIsAdminOtpVerified] = useState(
+    () => sessionStorage.getItem('careloop_admin_otp_verified') === 'true'
+  );
 
-  const fetchProfile = async (userId: string) => {
+  const fetchProfile = useCallback(async (userId: string): Promise<void> => {
+    // Never retain a profile belonging to a previous account.
+    setProfile(null);
+
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('*')
+        .select('id, role, status, full_name, email, phone, created_at, updated_at')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
 
-      if (!error && data) {
-        setProfile(data as Profile);
-      } else {
-        // User exists in auth but no profile row yet
-        console.warn('Profile not found for authenticated user:', error?.message);
+      if (error) {
+        console.error('[Auth] Profile query failed:', {
+          userId,
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+        });
+        return;
       }
-    } catch (err) {
-      console.error('Error fetching user profile:', err);
+
+      if (!data) {
+        console.error(
+          `[Auth] No visible profile found for authenticated user ${userId}. ` +
+          'Check that profiles.id matches auth.users.id and review SELECT RLS policies.'
+        );
+        return;
+      }
+
+      if (data.status !== 'active') {
+        console.error('[Auth] Account is not active:', {
+          userId,
+          status: data.status,
+        });
+        return;
+      }
+
+      setProfile(data as Profile);
+    } catch (error) {
+      console.error('[Auth] Unexpected profile lookup error:', error);
     }
-  };
+  }, []);
 
   useEffect(() => {
+    let mounted = true;
+
     if (!isSupabaseConfigured()) {
-      // Check if a demo session was stored
       const savedDemo = sessionStorage.getItem('careloop_demo_user');
+
       if (savedDemo) {
         try {
-          const parsed = JSON.parse(savedDemo);
-          setProfile(parsed);
-          setUser({ id: parsed.id, email: parsed.email } as any);
-        } catch (e) {
-          console.error(e);
+          const parsed = JSON.parse(savedDemo) as Profile;
+          if (mounted) {
+            setProfile(parsed);
+            setUser({ id: parsed.id, email: parsed.email } as User);
+          }
+        } catch (error) {
+          console.error('[Auth] Could not restore demo user:', error);
         }
       }
+
       setIsLoading(false);
-      return;
+      return () => {
+        mounted = false;
+      };
     }
 
-    // Initialize Supabase session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user.id).finally(() => setIsLoading(false));
+    // Register the listener before loading the initial session.
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      if (!mounted) return;
+
+      setSession(nextSession);
+      setUser(nextSession?.user ?? null);
+
+      if (!nextSession?.user) {
+        setProfile(null);
+        setIsAdminOtpVerified(false);
+        sessionStorage.removeItem('careloop_admin_otp_verified');
+        setIsLoading(false);
+        return;
+      }
+
+      // Defer the Supabase query until after the auth callback completes.
+      const userId = nextSession.user.id;
+      setProfile(null);
+
+      setTimeout(() => {
+        if (mounted) {
+          void fetchProfile(userId).finally(() => {
+            if (mounted) setIsLoading(false);
+          });
+        }
+      }, 0);
+    });
+
+    void supabase.auth.getSession().then(({ data, error }) => {
+      if (!mounted) return;
+
+      if (error) {
+        console.error('[Auth] Failed to load session:', error.message);
+      }
+
+      const currentSession = data.session;
+      setSession(currentSession);
+      setUser(currentSession?.user ?? null);
+
+      if (currentSession?.user) {
+        void fetchProfile(currentSession.user.id).finally(() => {
+          if (mounted) setIsLoading(false);
+        });
       } else {
+        setProfile(null);
         setIsLoading(false);
       }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          await fetchProfile(session.user.id);
-        } else {
-          setProfile(null);
-          setIsAdminOtpVerified(false);
-          sessionStorage.removeItem('careloop_admin_otp_verified');
-        }
-        setIsLoading(false);
-      }
-    );
-
     return () => {
+      mounted = false;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [fetchProfile]);
 
   const handleSetAdminOtpVerified = (verified: boolean) => {
     setIsAdminOtpVerified(verified);
+
     if (verified) {
       sessionStorage.setItem('careloop_admin_otp_verified', 'true');
     } else {
@@ -102,30 +170,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const refreshProfile = async () => {
+  const refreshProfile = async (): Promise<void> => {
     if (user) {
       await fetchProfile(user.id);
+    } else {
+      setProfile(null);
     }
   };
 
-  const signOut = async () => {
+  const signOut = async (): Promise<void> => {
     setIsLoading(true);
+
     try {
       if (isSupabaseConfigured()) {
-        await supabase.auth.signOut();
+        const { error } = await supabase.auth.signOut();
+        if (error) throw error;
       }
+
       sessionStorage.removeItem('careloop_demo_user');
       sessionStorage.removeItem('careloop_admin_otp_verified');
+
       setUser(null);
       setSession(null);
       setProfile(null);
       setIsAdminOtpVerified(false);
+    } catch (error) {
+      console.error('[Auth] Sign-out failed:', error);
+      throw error;
     } finally {
       setIsLoading(false);
     }
   };
 
-  const setDemoUser = (customProfile: Partial<Profile> & { role: Profile['role'] }) => {
+  const setDemoUser = (
+    customProfile: Partial<Profile> & { role: Profile['role'] }
+  ) => {
     const fullProfile: Profile = {
       id: customProfile.id || 'demo-admin-id',
       role: customProfile.role,
@@ -136,9 +215,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
+
     setProfile(fullProfile);
-    setUser({ id: fullProfile.id, email: fullProfile.email } as any);
+    setUser({ id: fullProfile.id, email: fullProfile.email } as User);
     sessionStorage.setItem('careloop_demo_user', JSON.stringify(fullProfile));
+
     if (customProfile.role === 'admin') {
       handleSetAdminOtpVerified(true);
     }
@@ -165,8 +246,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
+
   if (!context) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
+
   return context;
 };

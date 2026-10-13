@@ -7,7 +7,7 @@ interface ReportUploadModalProps {
   isOpen: boolean;
   onClose: () => void;
   task: CareTask;
-  onUploadSuccess: (taskId: string, fileName: string, fileSize: string) => void;
+  onUploadSuccess: (taskId: string, fileName: string, fileSize: string, file?: File) => void;
 }
 
 export const ReportUploadModal: React.FC<ReportUploadModalProps> = ({
@@ -68,7 +68,7 @@ export const ReportUploadModal: React.FC<ReportUploadModalProps> = ({
         setTimeout(() => {
           setIsUploading(false);
           const sizeString = `${(selectedFile.size / (1024 * 1024) || 1.15).toFixed(2)} MB`;
-          onUploadSuccess(task.id, selectedFile.name, sizeString);
+          onUploadSuccess(task.id, selectedFile.name, sizeString, selectedFile);
           onClose();
         }, 400);
       }

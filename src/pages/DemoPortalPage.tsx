@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useCareLoop } from '../hooks/useCareLoop';
-import { UserRole, CareTask, TestResult, NextAction, DelayReason, TaskType } from '../types';
+import { UserRole, CareTask, TestResult, NextAction, DelayReason, TaskType, CarePlan, PatientFeedback, SubmitFeedbackPayload, ReviewFeedbackPayload } from '../types';
 import { AppHeader } from '../components/layout/AppHeader';
 import { AppSidebar } from '../components/layout/AppSidebar';
 import { DemoRoleBanner } from '../components/layout/DemoRoleBanner';
@@ -14,6 +14,8 @@ import { DoctorReviewModal } from '../components/reports/DoctorReviewModal';
 import { CareTaskDetailModal } from '../components/care-tasks/CareTaskDetailModal';
 import { PatientHelpModal } from '../components/care-tasks/PatientHelpModal';
 import { CarePlanCreateModal } from '../components/care-plans/CarePlanCreateModal';
+import { PatientFeedbackModal } from '../components/feedback/PatientFeedbackModal';
+import { FeedbackReviewModal } from '../components/feedback/FeedbackReviewModal';
 import { NotificationsDrawer } from '../components/notifications/NotificationsDrawer';
 import { SimulatedWhatsAppModal } from '../components/notifications/SimulatedWhatsAppModal';
 import { ToastContainer, ToastMessage } from '../components/ui/Toast';
@@ -37,6 +39,9 @@ export const DemoPortalPage = () => {
   const [selectedTaskForHelp, setSelectedTaskForHelp] = useState<CareTask | null>(null);
   const [selectedTaskForVerify, setSelectedTaskForVerify] = useState<CareTask | null>(null);
   const [selectedTaskForReview, setSelectedTaskForReview] = useState<CareTask | null>(null);
+  const [selectedPlanForFeedback, setSelectedPlanForFeedback] = useState<CarePlan | null>(null);
+  const [selectedFeedbackToView, setSelectedFeedbackToView] = useState<PatientFeedback | null>(null);
+  const [selectedFeedbackForReview, setSelectedFeedbackForReview] = useState<PatientFeedback | null>(null);
   const [isCreatePlanModalOpen, setIsCreatePlanModalOpen] = useState(false);
 
   // Toasts
@@ -63,8 +68,43 @@ export const DemoPortalPage = () => {
     allTasks,
     roleTasks,
     notifications,
+    feedbacks,
     service
   } = useCareLoop(activeRole, activePatientId);
+
+  const handleFeedbackSubmit = async (payload: SubmitFeedbackPayload) => {
+    try {
+      const res = await service.submitPatientFeedback(payload);
+      if (res) {
+        addToast(
+          'success',
+          'Care Feedback Recorded',
+          'Your recovery experience and feedback have been sent to your doctor for review.'
+        );
+      }
+      setSelectedPlanForFeedback(null);
+    } catch (err: any) {
+      addToast('error', 'Feedback Submission Issue', err?.message || 'Failed to submit feedback.');
+      throw err;
+    }
+  };
+
+  const handleFeedbackReview = async (feedbackId: string, data: ReviewFeedbackPayload) => {
+    try {
+      const res = await service.completeFeedbackReview(feedbackId, data, currentUser.id);
+      if (res) {
+        addToast(
+          'success',
+          'Feedback Evaluation Completed',
+          `Closed loop for ${res.feedback.patientName}. Next action: "${data.nextAction}".`
+        );
+      }
+      setSelectedFeedbackForReview(null);
+    } catch (err: any) {
+      addToast('error', 'Review Failed', err?.message || 'Failed to complete review.');
+      throw err;
+    }
+  };
 
   // Synchronize role switch with proper default navigation tab
   const handleRoleChange = (newRole: UserRole) => {
@@ -302,9 +342,19 @@ export const DemoPortalPage = () => {
                   <PatientDashboard
                     patient={currentPatient}
                     tasks={roleTasks}
+                    carePlans={carePlans}
+                    feedbacks={feedbacks}
                     onOpenTaskDetails={setSelectedTaskForDetails}
                     onOpenUpload={setSelectedTaskForUpload}
                     onOpenHelpModal={setSelectedTaskForHelp}
+                    onOpenFeedbackModal={(cp) => {
+                      setSelectedPlanForFeedback(cp);
+                      setSelectedFeedbackToView(null);
+                    }}
+                    onViewFeedbackModal={(cp, fb) => {
+                      setSelectedPlanForFeedback(cp);
+                      setSelectedFeedbackToView(fb);
+                    }}
                   />
                 )}
 
@@ -397,8 +447,10 @@ export const DemoPortalPage = () => {
                     patients={patients}
                     carePlans={carePlans}
                     tasks={allTasks}
+                    feedbacks={feedbacks}
                     onOpenCreatePlan={() => setIsCreatePlanModalOpen(true)}
                     onOpenReview={setSelectedTaskForReview}
+                    onOpenFeedbackReview={setSelectedFeedbackForReview}
                     onOpenTaskDetails={setSelectedTaskForDetails}
                     onSelectPatient={(pId) => {
                       setActivePatientId(pId);
@@ -642,6 +694,32 @@ export const DemoPortalPage = () => {
         onClose={() => setIsWhatsAppModalOpen(false)}
         patientName={currentPatient.fullName}
       />
+
+      {/* 10. Patient Feedback Modal */}
+      {selectedPlanForFeedback && (
+        <PatientFeedbackModal
+          isOpen={true}
+          carePlan={selectedPlanForFeedback}
+          patientName={currentPatient.fullName}
+          patientId={currentPatient.id}
+          existingFeedback={selectedFeedbackToView}
+          onClose={() => {
+            setSelectedPlanForFeedback(null);
+            setSelectedFeedbackToView(null);
+          }}
+          onSubmit={handleFeedbackSubmit}
+        />
+      )}
+
+      {/* 11. Doctor Feedback Review Modal */}
+      {selectedFeedbackForReview && (
+        <FeedbackReviewModal
+          isOpen={true}
+          feedback={selectedFeedbackForReview}
+          onClose={() => setSelectedFeedbackForReview(null)}
+          onCompleteReview={handleFeedbackReview}
+        />
+      )}
 
       {/* 9. Global Toast Container */}
       <ToastContainer toasts={toasts} onDismiss={removeToast} />

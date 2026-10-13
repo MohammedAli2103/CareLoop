@@ -224,7 +224,7 @@ export interface NotificationItem {
   channel: 'in-app' | 'whatsapp' | 'sms';
   title: string;
   message: string;
-  type: 'deadline_reminder' | 'overdue_alert' | 'verification_needed' | 'doctor_review_ready' | 'escalation';
+  type: 'deadline_reminder' | 'overdue_alert' | 'verification_needed' | 'doctor_review_ready' | 'escalation' | 'general';
   isRead: boolean;
   sentAt: string;
   actionLink?: string;
@@ -260,3 +260,91 @@ export interface DashboardStats {
   overdueTasks: number;
   resolvedTasks: number;
 }
+
+// ==============================================================================
+// Patient Feedback & Closed-Loop Care Types
+// ==============================================================================
+
+export type ImprovementStatus = 
+  | 'much_better' 
+  | 'somewhat_better' 
+  | 'no_change' 
+  | 'worse_than_before';
+
+export type AdherenceStatus = 
+  | 'followed_all' 
+  | 'followed_some' 
+  | 'partially'
+  | 'unable_to_follow';
+
+export type BarrierType = 
+  | 'no_difficulties' 
+  | 'none'
+  | 'cost' 
+  | 'travel_or_access' 
+  | 'side_effects' 
+  | 'unclear_instructions' 
+  | 'other';
+
+export type FeedbackReviewStatus = 
+  | 'pending' 
+  | 'action_required' 
+  | 'reviewed';
+
+export interface PatientFeedback {
+  id: string;
+  patientId: string;
+  patientName?: string;
+  patientMrn?: string;
+  carePlanId: string;
+  carePlanTitle?: string;
+  carePlanDiagnosis?: string;
+  improvementStatus: ImprovementStatus;
+  adherenceStatus: AdherenceStatus;
+  barrierType: BarrierType;
+  barrierOtherDetails?: string;
+  experienceRating: number; // 1 to 5 stars
+  comments?: string;
+  worseningReported: boolean;
+  worseningDetails?: string;
+  safetyAcknowledged: boolean;
+  reviewStatus: FeedbackReviewStatus;
+  doctorResponse?: string;
+  reviewedBy?: string;
+  reviewedByName?: string;
+  reviewedAt?: string;
+  nextAction?: NextAction | 'New Care Plan Created';
+  careGapIdentified?: string;
+  followUpTaskId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SubmitFeedbackPayload {
+  carePlanId: string;
+  patientId?: string; // Derived from authenticated user on server
+  improvementStatus: ImprovementStatus;
+  adherenceStatus: AdherenceStatus;
+  barrierType: BarrierType;
+  barrierOtherDetails?: string;
+  experienceRating: number; // 1 to 5
+  comments?: string;
+  worseningReported: boolean;
+  worseningDetails?: string;
+  safetyAcknowledged: boolean;
+}
+
+export interface ReviewFeedbackPayload {
+  doctorResponse: string;
+  nextAction: NextAction | 'New Care Plan Created';
+  careGapIdentified?: string;
+  createFollowUpTask?: boolean;
+  followUpTaskDetails?: {
+    title: string;
+    taskType: TaskType;
+    deadlineDays: number;
+    instructions?: string;
+    partnerFacility?: string;
+  };
+}
+

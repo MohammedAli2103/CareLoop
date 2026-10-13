@@ -79,23 +79,48 @@ export const PatientVerifyOtpPage: React.FC = () => {
         }
       }
 
-      // Fallback/Testing handler for unconfigured SMS provider
+      // Fallback/Testing handler for unconfigured SMS provider or demo patient session
       const savedReg = sessionStorage.getItem('careloop_patient_reg_data');
-      let patientName = 'Robert Miller';
-      let patientEmail = 'patient@careloop.com';
       if (savedReg) {
         const parsed = JSON.parse(savedReg);
-        patientName = parsed.fullName;
-        patientEmail = parsed.email;
+        setDemoUser({
+          id: '33333333-3333-4333-a333-333333333333',
+          role: 'patient',
+          status: 'active',
+          full_name: parsed.fullName || 'Sarah Khan',
+          email: parsed.email || 'sarah.khan@careloop.io',
+          phone: phoneParam,
+        });
+        sessionStorage.removeItem('careloop_patient_reg_data');
+        navigate('/patient/dashboard');
+        return;
+      }
+
+      // Default demo patient login -> Sarah Khan
+      // Attempt authenticating with seeded credentials if available
+      try {
+        if (isSupabaseConfigured()) {
+          const { data: supaAuth, error: supaErr } = await supabase.auth.signInWithPassword({
+            email: 'sarah.khan@careloop.io',
+            password: 'Patient123!',
+          });
+          if (!supaErr && supaAuth?.user) {
+            await refreshProfile();
+            navigate('/patient/dashboard');
+            return;
+          }
+        }
+      } catch (authFallbackErr) {
+        console.warn('Seeded Supabase Auth attempt failed, falling back to client demo session:', authFallbackErr);
       }
 
       setDemoUser({
-        id: 'patient-' + Date.now(),
+        id: '33333333-3333-4333-a333-333333333333',
         role: 'patient',
         status: 'active',
-        full_name: patientName,
-        email: patientEmail,
-        phone: phoneParam,
+        full_name: 'Sarah Khan',
+        email: 'sarah.khan@careloop.io',
+        phone: phoneParam || '+91 91234 56789',
       });
 
       navigate('/patient/dashboard');

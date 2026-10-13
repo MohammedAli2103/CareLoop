@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useCareLoop } from '../../hooks/useCareLoop';
-import { CareTask, NextAction, TaskType } from '../../types';
+import { CareTask, NextAction, TaskType, PatientFeedback, ReviewFeedbackPayload } from '../../types';
 import { DoctorDashboard } from '../../components/dashboard/DoctorDashboard';
 import { DoctorReviewModal } from '../../components/reports/DoctorReviewModal';
+import { FeedbackReviewModal } from '../../components/feedback/FeedbackReviewModal';
 import { CarePlanCreateModal } from '../../components/care-plans/CarePlanCreateModal';
 import { CareTaskDetailModal } from '../../components/care-tasks/CareTaskDetailModal';
 import { NotificationsDrawer } from '../../components/notifications/NotificationsDrawer';
@@ -24,6 +25,7 @@ export const DoctorDashboardPage: React.FC = () => {
   // Modals
   const [selectedTaskForReview, setSelectedTaskForReview] = useState<CareTask | null>(null);
   const [selectedTaskForDetails, setSelectedTaskForDetails] = useState<CareTask | null>(null);
+  const [selectedFeedbackForReview, setSelectedFeedbackForReview] = useState<PatientFeedback | null>(null);
   const [isCreatePlanModalOpen, setIsCreatePlanModalOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 
@@ -48,6 +50,7 @@ export const DoctorDashboardPage: React.FC = () => {
     carePlans,
     allTasks,
     notifications,
+    feedbacks,
     actions
   } = useCareLoop('doctor');
 
@@ -97,6 +100,23 @@ export const DoctorDashboardPage: React.FC = () => {
       }
     } catch {
       addToast('error', 'Review Failed', 'Failed to complete review.');
+    }
+  };
+
+  const handleCompleteFeedbackReview = async (feedbackId: string, data: ReviewFeedbackPayload) => {
+    try {
+      const res = await actions.completeFeedbackReview(feedbackId, data, profile?.id || currentUser.id);
+      if (res) {
+        addToast(
+          'success',
+          'Feedback Evaluation Completed',
+          `Closed loop for ${res.feedback.patientName}. Next action: "${data.nextAction}".`
+        );
+      } else {
+        addToast('error', 'Review Error', 'Could not save feedback evaluation.');
+      }
+    } catch (err: any) {
+      addToast('error', 'Review Failed', err?.message || 'Failed to complete review.');
     }
   };
 
@@ -173,8 +193,10 @@ export const DoctorDashboardPage: React.FC = () => {
           patients={patients}
           carePlans={carePlans}
           tasks={allTasks}
+          feedbacks={feedbacks}
           onOpenCreatePlan={() => setIsCreatePlanModalOpen(true)}
           onOpenReview={setSelectedTaskForReview}
+          onOpenFeedbackReview={setSelectedFeedbackForReview}
           onOpenTaskDetails={setSelectedTaskForDetails}
           onSelectPatient={(_patientId) => {
             // Patient selected
@@ -190,6 +212,15 @@ export const DoctorDashboardPage: React.FC = () => {
           task={selectedTaskForReview}
           onClose={() => setSelectedTaskForReview(null)}
           onCompleteReview={handleCompleteReview}
+        />
+      )}
+
+      {selectedFeedbackForReview && (
+        <FeedbackReviewModal
+          isOpen={true}
+          feedback={selectedFeedbackForReview}
+          onClose={() => setSelectedFeedbackForReview(null)}
+          onCompleteReview={handleCompleteFeedbackReview}
         />
       )}
 

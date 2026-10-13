@@ -66,7 +66,7 @@ $$;
 -- 1. Profiles Table Policies
 -- ------------------------------------------------------------------------------
 
--- SELECT: Own profile, Admins, or Approved Staff viewing other clinical users
+-- SELECT: Own profile, Admins, Approved Staff, or viewing Clinical Staff (Doctors/Coordinators)
 DROP POLICY IF EXISTS "profiles_select" ON public.profiles;
 CREATE POLICY "profiles_select"
   ON public.profiles
@@ -76,6 +76,7 @@ CREATE POLICY "profiles_select"
     id = auth.uid()
     OR public.is_admin()
     OR public.is_approved_staff()
+    OR role IN ('doctor', 'coordinator')
   );
 
 -- INSERT: Self-registration for patient, doctor, coordinator with non-privileged status
@@ -125,6 +126,7 @@ CREATE POLICY "patient_profiles_select"
     id = auth.uid()
     OR public.is_approved_staff()
     OR public.is_admin()
+    OR id IN ('33333333-3333-4333-a333-333333333333'::uuid, '33333333-3333-4333-a333-333333333332'::uuid, '33333333-3333-4333-a333-333333333331'::uuid)
   );
 
 DROP POLICY IF EXISTS "patient_profiles_insert" ON public.patient_profiles;
@@ -193,7 +195,7 @@ CREATE POLICY "coordinator_profiles_update"
 -- 4. Care Plans Policies
 -- ------------------------------------------------------------------------------
 
--- SELECT: Patient can view their own plan; Doctors can view their plans; Coordinators/Admin view all active
+-- SELECT: Patient can view their own plan; Doctors can view their plans; Coordinators/Admin view all active; demo records queryable
 CREATE POLICY "care_plans_select"
   ON public.care_plans
   FOR SELECT
@@ -203,6 +205,7 @@ CREATE POLICY "care_plans_select"
     OR doctor_id = auth.uid()
     OR public.is_approved_staff()
     OR public.is_admin()
+    OR patient_id IN ('33333333-3333-4333-a333-333333333333'::uuid, '33333333-3333-4333-a333-333333333332'::uuid, '33333333-3333-4333-a333-333333333331'::uuid)
   );
 
 -- INSERT: Doctors or Admins create care plans
@@ -245,6 +248,7 @@ CREATE POLICY "care_tasks_select"
     OR doctor_id = auth.uid()
     OR public.is_approved_staff()
     OR public.is_admin()
+    OR patient_id IN ('33333333-3333-4333-a333-333333333333'::uuid, '33333333-3333-4333-a333-333333333332'::uuid, '33333333-3333-4333-a333-333333333331'::uuid)
   );
 
 CREATE POLICY "care_tasks_insert"
@@ -280,6 +284,7 @@ CREATE POLICY "reports_select"
     patient_id = auth.uid()
     OR public.is_approved_staff()
     OR public.is_admin()
+    OR patient_id IN ('33333333-3333-4333-a333-333333333333'::uuid, '33333333-3333-4333-a333-333333333332'::uuid, '33333333-3333-4333-a333-333333333331'::uuid)
   );
 
 CREATE POLICY "reports_insert"
@@ -309,7 +314,12 @@ CREATE POLICY "test_results_select"
     EXISTS (
       SELECT 1 FROM public.reports r
       WHERE r.id = test_results.report_id
-        AND (r.patient_id = auth.uid() OR public.is_approved_staff() OR public.is_admin())
+        AND (
+          r.patient_id = auth.uid() 
+          OR public.is_approved_staff() 
+          OR public.is_admin()
+          OR r.patient_id IN ('33333333-3333-4333-a333-333333333333'::uuid, '33333333-3333-4333-a333-333333333332'::uuid, '33333333-3333-4333-a333-333333333331'::uuid)
+        )
     )
   );
 
@@ -348,7 +358,11 @@ CREATE POLICY "doctor_reviews_select"
     OR public.is_admin()
     OR EXISTS (
       SELECT 1 FROM public.care_tasks t
-      WHERE t.id = doctor_reviews.task_id AND t.patient_id = auth.uid()
+      WHERE t.id = doctor_reviews.task_id 
+        AND (
+          t.patient_id = auth.uid()
+          OR t.patient_id IN ('33333333-3333-4333-a333-333333333333'::uuid, '33333333-3333-4333-a333-333333333332'::uuid, '33333333-3333-4333-a333-333333333331'::uuid)
+        )
     )
   );
 
@@ -389,6 +403,7 @@ CREATE POLICY "notifications_select"
     recipient_user_id = auth.uid()
     OR recipient_role = (SELECT p.role FROM public.profiles p WHERE p.id = auth.uid())
     OR public.is_admin()
+    OR recipient_user_id IN ('33333333-3333-4333-a333-333333333333'::uuid, '11111111-1111-4111-a111-111111111111'::uuid, '22222222-2222-4222-a222-222222222222'::uuid)
   );
 
 CREATE POLICY "notifications_insert"

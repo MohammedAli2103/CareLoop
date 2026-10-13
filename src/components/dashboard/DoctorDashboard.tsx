@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { CarePlan, CareTask, Patient, User, TaskType } from '../../types';
+import { CarePlan, CareTask, Patient, User, TaskType, PatientFeedback } from '../../types';
+import { DoctorFeedbackQueue } from '../feedback/DoctorFeedbackQueue';
 import { 
   FileText, 
   Clock, 
@@ -18,8 +19,10 @@ interface DoctorDashboardProps {
   patients: Patient[];
   carePlans: CarePlan[];
   tasks: CareTask[];
+  feedbacks?: PatientFeedback[];
   onOpenCreatePlan?: () => void;
   onOpenReview: (task: CareTask) => void;
+  onOpenFeedbackReview?: (feedback: PatientFeedback) => void;
   onOpenTaskDetails: (task: CareTask) => void;
   onSelectPatient: (patientId: string) => void;
   onCreateCarePlan?: (data: {
@@ -41,8 +44,10 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({
   patients,
   carePlans,
   tasks,
+  feedbacks = [],
   onOpenCreatePlan,
   onOpenReview,
+  onOpenFeedbackReview,
   onOpenTaskDetails,
   onSelectPatient,
   onCreateCarePlan
@@ -235,9 +240,17 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({
       {/* 3. Main Two-Column Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* ======================================================== */}
-        {/* LEFT COLUMN: Reports to Review + Patients to Follow Up */}
+        {/* LEFT COLUMN: Feedback Review Queue + Reports + Follow-Ups */}
         {/* ======================================================== */}
         <div className="lg:col-span-7 space-y-6">
+          {/* Closed-Loop Patient Feedback Review Queue (Core Requirement 6) */}
+          <DoctorFeedbackQueue
+            feedbacks={feedbacks}
+            onOpenReview={(fb) => {
+              if (onOpenFeedbackReview) onOpenFeedbackReview(fb);
+            }}
+          />
+
           {/* Card: Reports to Review Table */}
           <div className="rounded-3xl border border-slate-200/90 bg-white p-6 shadow-2xs space-y-4">
             <div className="flex items-center justify-between">

@@ -14,7 +14,10 @@ import {
   TaskType,
   TestResult,
   NextAction,
-  DelayReason
+  DelayReason,
+  PatientFeedback,
+  SubmitFeedbackPayload,
+  ReviewFeedbackPayload
 } from '../types';
 
 export function useCareLoop(activeRole: UserRole, activePatientId = 'patient-1') {
@@ -25,20 +28,22 @@ export function useCareLoop(activeRole: UserRole, activePatientId = 'patient-1')
   const [notifications, setNotifications] = useState<NotificationItem[]>(() => careLoopService.getNotifications(activeRole));
   const [allNotifications, setAllNotifications] = useState<NotificationItem[]>(() => careLoopService.getNotifications());
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>(() => careLoopService.getAuditLogs());
+  const [feedbacks, setFeedbacks] = useState<PatientFeedback[]>(() => careLoopService.getFeedbacks());
   const [loading, setLoading] = useState(false);
   const [isUsingSupabase, setIsUsingSupabase] = useState<boolean>(() => isSupabaseConfigured());
 
   const refreshData = useCallback(async () => {
     if (isSupabaseConfigured()) {
       try {
-        const [u, p, cp, t, n, allN, al] = await Promise.all([
+        const [u, p, cp, t, n, allN, al, fb] = await Promise.all([
           supabaseCareLoopService.getUsers(),
           supabaseCareLoopService.getPatients(),
           supabaseCareLoopService.getCarePlans(),
           supabaseCareLoopService.getTasks(),
           supabaseCareLoopService.getNotifications(activeRole),
           supabaseCareLoopService.getNotifications(),
-          supabaseCareLoopService.getAuditLogs()
+          supabaseCareLoopService.getAuditLogs(),
+          supabaseCareLoopService.getFeedbacks()
         ]);
 
         // If real database returned rows, use them
@@ -49,6 +54,7 @@ export function useCareLoop(activeRole: UserRole, activePatientId = 'patient-1')
         if (n && n.length > 0) setNotifications(n);
         if (allN && allN.length > 0) setAllNotifications(allN);
         if (al && al.length > 0) setAuditLogs(al);
+        if (fb && fb.length > 0) setFeedbacks(fb);
         setIsUsingSupabase(true);
         return;
       } catch (err) {
@@ -64,6 +70,7 @@ export function useCareLoop(activeRole: UserRole, activePatientId = 'patient-1')
     setNotifications(careLoopService.getNotifications(activeRole));
     setAllNotifications(careLoopService.getNotifications());
     setAuditLogs(careLoopService.getAuditLogs());
+    setFeedbacks(careLoopService.getFeedbacks());
     setIsUsingSupabase(false);
   }, [activeRole]);
 
@@ -80,32 +87,79 @@ export function useCareLoop(activeRole: UserRole, activePatientId = 'patient-1')
     };
   }, [refreshData]);
 
+const DEMO_PATIENT_UUID_MAP: Record<string, string> = {
+  'patient-1': '33333333-3333-4333-a333-333333333333',
+  'patient-2': '33333333-3333-4333-a333-333333333332',
+  'patient-3': '33333333-3333-4333-a333-333333333331',
+  '33333333-3333-4333-a333-333333333333': 'patient-1',
+  '33333333-3333-4333-a333-333333333332': 'patient-2',
+  '33333333-3333-4333-a333-333333333331': 'patient-3',
+};
+
   // Filter tasks for active role
   const roleTasks = useMemo(() => {
     if (activeRole === 'patient') {
       const targetId = activePatientId || (patients[0]?.id ?? 'patient-1');
-      return allTasks.filter(t => t.patientId === targetId);
+      const alternateId = DEMO_PATIENT_UUID_MAP[targetId];
+
+      const filtered = allTasks.filter(t => 
+        t.patientId === targetId || 
+        (alternateId && t.patientId === alternateId)
+      );
+
+      // If active patient has tasks, return them
+      if (filtered.length > 0) return filtered;
+
+      // If active patient has no tasks (e.g. demo session with unassigned ID),
+      // fallback to the primary demo patient (Sarah Khan) tasks so dashboard is populated
+      if (
+        targetId === 'patient-1' || 
+        targetId === patients[0]?.id || 
+        !activePatientId || 
+        targetId.startsWith('patient-') ||
+        targetId === '33333333-3333-4333-a333-333333333333'
+      ) {
+        const firstPatientId = patients[0]?.id || '33333333-3333-4333-a333-333333333333';
+        const firstPatientAlt = DEMO_PATIENT_UUID_MAP[firstPatientId];
+        const fallbackTasks = allTasks.filter(t => 
+          t.patientId === firstPatientId || 
+          (firstPatientAlt && t.patientId === firstPatientAlt) ||
+          t.patientId === '33333333-3333-4333-a333-333333333333' ||
+          t.patientId === 'patient-1'
+        );
+        if (fallbackTasks.length > 0) return fallbackTasks;
+      }
+
+      return filtered;
     }
     return allTasks;
   }, [allTasks, activeRole, activePatientId, patients]);
 
   const currentPatient = useMemo(() => {
-    return patients.find(p => p.id === activePatientId) || patients[0] || {
-      id: 'patient-1',
-      userId: 'patient-1',
-      mrn: 'MRN-84920',
-      fullName: 'Sarah Khan',
-      dateOfBirth: '1989-06-14',
-      age: 37,
-      gender: 'Female',
-      phone: '+91 91234 56789',
-      email: 'sarah.khan@careloop.io',
-      emergencyContact: 'Tariq Khan (Spouse - +91 91234 56780)',
-      primaryDiagnosis: 'Type 2 Diabetes Mellitus with Dyslipidemia',
-      assignedDoctorId: 'doctor-1',
-      assignedDoctorName: 'Dr. Arjun Mehta, MD',
-      bloodGroup: 'B+'
-    };
+    const targetId = activePatientId || 'patient-1';
+    const altId = DEMO_PATIENT_UUID_MAP[targetId];
+
+    return (
+      patients.find(p => p.id === targetId || p.userId === targetId) ||
+      (altId ? patients.find(p => p.id === altId || p.userId === altId) : undefined) ||
+      patients[0] ||
+      {
+        id: 'patient-1',
+        userId: 'patient-1',
+        mrn: 'MRN-84920',
+        fullName: 'Sarah Khan',
+        dateOfBirth: '1989-06-14',
+        age: 37,
+        gender: 'Female',
+        phone: '+91 91234 56789',
+        email: 'sarah.khan@careloop.io',
+        emergencyContact: 'Tariq Khan (Spouse - +91 91234 56780)',
+        primaryDiagnosis: 'Type 2 Diabetes Mellitus with Dyslipidemia',
+        assignedDoctorId: '11111111-1111-4111-a111-111111111111',
+        assignedDoctorName: 'Dr. Arjun Mehta, MD',
+        bloodGroup: 'B+'
+      }
+    );
   }, [patients, activePatientId]);
 
   const currentUser = useMemo(() => {
@@ -315,9 +369,53 @@ export function useCareLoop(activeRole: UserRole, activePatientId = 'patient-1')
         }
         careLoopService.markAllNotificationsRead(role);
         refreshData();
+      },
+
+      // Patient Feedback & Closed-Loop Care actions
+      submitPatientFeedback: async (payload: SubmitFeedbackPayload) => {
+        try {
+          if (isSupabaseConfigured()) {
+            const res = await supabaseCareLoopService.submitPatientFeedback(payload);
+            if (res) {
+              await refreshData();
+              return res;
+            }
+          }
+        } catch (err) {
+          // If business rule violation, let caller handle
+          if (isSupabaseConfigured()) {
+            throw err;
+          }
+        }
+        const res = careLoopService.submitPatientFeedback(payload);
+        await refreshData();
+        return res;
+      },
+
+      completeFeedbackReview: async (feedbackId: string, data: ReviewFeedbackPayload, doctorId?: string) => {
+        try {
+          if (isSupabaseConfigured()) {
+            const res = await supabaseCareLoopService.completeFeedbackReview(feedbackId, data, doctorId);
+            if (res) {
+              await refreshData();
+              return res;
+            }
+          }
+        } catch (err) {
+          if (isSupabaseConfigured()) {
+            throw err;
+          }
+        }
+        const res = careLoopService.completeFeedbackReview(feedbackId, data, doctorId);
+        await refreshData();
+        return res;
+      },
+
+      getFeedbackForCarePlan: (carePlanId: string) => {
+        return feedbacks.find(f => f.carePlanId === carePlanId);
       }
     };
-  }, [refreshData]);
+  }, [refreshData, feedbacks]);
 
   return {
     users,
@@ -330,6 +428,7 @@ export function useCareLoop(activeRole: UserRole, activePatientId = 'patient-1')
     notifications,
     allNotifications,
     auditLogs,
+    feedbacks,
     stats,
     loading,
     isUsingSupabase,

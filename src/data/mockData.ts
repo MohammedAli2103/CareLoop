@@ -1,4 +1,4 @@
-import { User, Patient, CarePlan, CareTask, NotificationItem, AuditLog } from '../types';
+import { User, Patient, CarePlan, CareTask, NotificationItem, AuditLog, PatientFeedback } from '../types';
 
 export const INITIAL_USERS: User[] = [
   {
@@ -235,6 +235,62 @@ export const INITIAL_CARE_PLANS: CarePlan[] = [
     targetEndDate: '2026-10-25',
     clinicalNotes: 'Fasting lipid panel evaluation for statin dosage optimization.',
     taskIds: ['task-doc-rev-2']
+  },
+  {
+    id: 'plan-completed-1',
+    patientId: 'patient-1',
+    patientName: 'Sarah Khan',
+    doctorId: 'user-doctor-1',
+    doctorName: 'Dr. Arjun Mehta',
+    title: 'Initial Glycemic Stabilization & Baseline Lab Series',
+    diagnosis: 'Prediabetes & Metabolic Evaluation',
+    status: 'Completed',
+    startDate: '2026-08-15',
+    targetEndDate: '2026-10-05',
+    clinicalNotes: 'Protocol concluded following completion of baseline lab work and chest imaging. Ready for post-protocol patient recovery evaluation.',
+    taskIds: []
+  },
+  {
+    id: '44444444-4444-4444-a444-444444444443',
+    patientId: 'patient-1',
+    patientName: 'Sarah Khan',
+    doctorId: 'user-doctor-1',
+    doctorName: 'Dr. Arjun Mehta',
+    title: 'Initial Glycemic Stabilization & Baseline Lab Series',
+    diagnosis: 'Prediabetes & Metabolic Evaluation',
+    status: 'Completed',
+    startDate: '2026-07-01',
+    targetEndDate: '2026-10-10',
+    clinicalNotes: 'Concluded baseline diagnostic monitoring protocol. Awaiting post-protocol recovery evaluation.',
+    taskIds: []
+  },
+  {
+    id: 'efb53af1-7122-44a9-973c-3b13074f675c',
+    patientId: 'patient-1',
+    patientName: 'Sarah Khan',
+    doctorId: 'user-doctor-1',
+    doctorName: 'Dr. Arjun Mehta',
+    title: 'Initial Glycemic Stabilization & Baseline Lab Series',
+    diagnosis: 'Prediabetes & Metabolic Evaluation',
+    status: 'Completed',
+    startDate: '2026-07-01',
+    targetEndDate: '2026-10-10',
+    clinicalNotes: 'Concluded baseline diagnostic monitoring protocol. Awaiting post-protocol recovery evaluation.',
+    taskIds: []
+  },
+  {
+    id: 'plan-completed-2',
+    patientId: 'patient-2',
+    patientName: 'Vikram Kumar',
+    doctorId: 'user-doctor-1',
+    doctorName: 'Dr. Arjun Mehta',
+    title: 'Post-Diabetic Neuropathy & Foot Care Protocol',
+    diagnosis: 'Type 2 Diabetes Mellitus with Peripheral Neuropathy',
+    status: 'Completed',
+    startDate: '2026-08-20',
+    targetEndDate: '2026-10-11',
+    clinicalNotes: 'Completed 6-week neuropathy monitoring series.',
+    taskIds: []
   }
 ];
 
@@ -1222,3 +1278,61 @@ export const INITIAL_AUDIT_LOGS: AuditLog[] = [
     details: 'Chest X-ray reviewed and normal findings signed off. Care loop closed.'
   }
 ];
+
+export const INITIAL_FEEDBACKS: PatientFeedback[] = [
+  {
+    id: 'fb-sarah-1',
+    patientId: 'patient-1',
+    patientName: 'Sarah Khan',
+    patientMrn: 'PT-84920',
+    carePlanId: 'plan-completed-1',
+    carePlanTitle: 'Initial Glycemic Stabilization & Baseline Lab Series',
+    carePlanDiagnosis: 'Prediabetes & Metabolic Evaluation',
+    improvementStatus: 'somewhat_better',
+    adherenceStatus: 'followed_some',
+    barrierType: 'no_difficulties',
+    experienceRating: 4,
+    comments: 'I found the blood test instructions very straightforward, although I struggled somewhat to keep to the fasting window.',
+    worseningReported: false,
+    safetyAcknowledged: false,
+    reviewStatus: 'pending',
+    createdAt: '2026-10-11T14:30:00Z',
+    updatedAt: '2026-10-11T14:30:00Z'
+  },
+  {
+    id: 'fb-vikram-1',
+    patientId: 'patient-2',
+    patientName: 'Vikram Kumar',
+    patientMrn: 'PT-60291',
+    carePlanId: 'plan-completed-2',
+    carePlanTitle: 'Post-Diabetic Neuropathy & Foot Care Protocol',
+    carePlanDiagnosis: 'Type 2 Diabetes Mellitus with Peripheral Neuropathy',
+    improvementStatus: 'worse_than_before',
+    adherenceStatus: 'unable_to_follow',
+    barrierType: 'side_effects',
+    barrierOtherDetails: 'Severe nausea and peripheral tingling became acute',
+    experienceRating: 2,
+    comments: 'Symptoms deteriorated after week 4. Tingling in left foot increased and feeling lightheaded after morning medication.',
+    worseningReported: true,
+    worseningDetails: 'Acute dizzy spells upon standing and sharp numbness spreading to toes.',
+    safetyAcknowledged: true,
+    reviewStatus: 'action_required',
+    createdAt: '2026-10-12T09:15:00Z',
+    updatedAt: '2026-10-12T09:15:00Z'
+  }
+];
+
+// Mapping legacy or mock care plan string keys to real Supabase UUID records
+export const CARE_PLAN_UUID_MAP: Record<string, string> = {
+  'plan-completed-prompt': 'efb53af1-7122-44a9-973c-3b13074f675c',
+  'plan-completed-1': 'efb53af1-7122-44a9-973c-3b13074f675c',
+  'plan-completed-2': '44444444-4444-4444-a444-444444444445',
+};
+
+// Mapping legacy or mock feedback string IDs to real Supabase UUID records
+export const FEEDBACK_UUID_MAP: Record<string, string> = {
+  'fb-sarah-1': '8dcd2e4f-2b1d-4518-8d70-96a78f2ccbc9',
+  'fb-vikram-1': '55555555-5555-5555-a555-555555555552',
+};
+
+export const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

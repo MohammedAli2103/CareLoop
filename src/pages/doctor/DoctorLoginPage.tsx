@@ -38,11 +38,11 @@ export const DoctorLoginPage: React.FC = () => {
 
       // Demo/Fallback doctor login
       setDemoUser({
-        id: 'doc-' + Date.now(),
+        id: '11111111-1111-4111-a111-111111111111',
         role: 'doctor',
         status: email.includes('pending') ? 'pending' : 'active',
-        full_name: 'Dr. Rajesh Kumar',
-        email: email || 'rajesh@hospital.com',
+        full_name: 'Dr. Arjun Mehta, MD',
+        email: email || 'dr.mehta@careloop-health.org',
       });
 
       navigate('/doctor/dashboard');

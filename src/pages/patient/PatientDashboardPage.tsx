@@ -2,12 +2,14 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useCareLoop } from '../../hooks/useCareLoop';
-import { CareTask } from '../../types';
+import { CareTask, CarePlan, PatientFeedback, SubmitFeedbackPayload } from '../../types';
 import { PatientDashboard } from '../../components/dashboard/PatientDashboard';
 import { CarePlanTimeline } from '../../components/care-plans/CarePlanTimeline';
 import { ReportUploadModal } from '../../components/reports/ReportUploadModal';
 import { CareTaskDetailModal } from '../../components/care-tasks/CareTaskDetailModal';
 import { PatientHelpModal } from '../../components/care-tasks/PatientHelpModal';
+import { PatientFeedbackModal } from '../../components/feedback/PatientFeedbackModal';
+import { CarePlanFeedbackBanner } from '../../components/feedback/CarePlanFeedbackBanner';
 import { NotificationsDrawer } from '../../components/notifications/NotificationsDrawer';
 import { ToastContainer, ToastMessage } from '../../components/ui/Toast';
 import { StatusBadge } from '../../components/ui/StatusBadge';
@@ -32,6 +34,8 @@ export const PatientDashboardPage: React.FC = () => {
   const [selectedTaskForDetails, setSelectedTaskForDetails] = useState<CareTask | null>(null);
   const [selectedTaskForUpload, setSelectedTaskForUpload] = useState<CareTask | null>(null);
   const [selectedTaskForHelp, setSelectedTaskForHelp] = useState<CareTask | null>(null);
+  const [selectedPlanForFeedback, setSelectedPlanForFeedback] = useState<CarePlan | null>(null);
+  const [selectedFeedbackToView, setSelectedFeedbackToView] = useState<PatientFeedback | null>(null);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 
   // Toasts
@@ -53,17 +57,20 @@ export const PatientDashboardPage: React.FC = () => {
   const patientId = profile?.id || 'patient-1';
   const {
     currentPatient,
+    carePlans,
     roleTasks,
     notifications,
+    feedbacks,
     actions
   } = useCareLoop('patient', patientId);
 
-  const handleUploadSuccess = async (taskId: string, fileName: string, fileSize: string) => {
+  const handleUploadSuccess = async (taskId: string, fileName: string, fileSize: string, file?: File) => {
     try {
       const updated = await actions.uploadReport(taskId, {
+        file,
         fileName,
         fileSize,
-        fileType: 'application/pdf',
+        fileType: file?.type || 'application/pdf',
         patientId
       });
 
@@ -78,6 +85,23 @@ export const PatientDashboardPage: React.FC = () => {
       }
     } catch {
       addToast('error', 'Upload Failed', 'Error uploading file.');
+    }
+  };
+
+  const handleFeedbackSubmit = async (payload: SubmitFeedbackPayload) => {
+    try {
+      const res = await actions.submitPatientFeedback(payload);
+      if (res) {
+        addToast(
+          'success',
+          'Care Feedback Recorded',
+          'Your recovery experience and feedback have been sent to your doctor for review.'
+        );
+      }
+      return res;
+    } catch (err: any) {
+      addToast('error', 'Feedback Submission Issue', err?.message || 'Failed to submit feedback.');
+      throw err;
     }
   };
 
@@ -183,9 +207,19 @@ export const PatientDashboardPage: React.FC = () => {
           <PatientDashboard
             patient={currentPatient}
             tasks={roleTasks}
+            carePlans={carePlans}
+            feedbacks={feedbacks}
             onOpenTaskDetails={setSelectedTaskForDetails}
             onOpenUpload={setSelectedTaskForUpload}
             onOpenHelpModal={setSelectedTaskForHelp}
+            onOpenFeedbackModal={(cp) => {
+              setSelectedPlanForFeedback(cp);
+              setSelectedFeedbackToView(null);
+            }}
+            onViewFeedbackModal={(cp, fb) => {
+              setSelectedPlanForFeedback(cp);
+              setSelectedFeedbackToView(fb);
+            }}
           />
         )}
 
@@ -199,18 +233,47 @@ export const PatientDashboardPage: React.FC = () => {
               </p>
             </div>
 
-            <div className="space-y-4">
-              {roleTasks.map((task) => (
-                <CarePlanTimeline
-                  key={task.id}
-                  currentStatus={task.taskStatus}
-                  taskTitle={task.title}
-                  hasReport={!!task.report}
-                  isVerified={task.report?.verificationStatus === 'Verified'}
-                  isReviewed={task.taskStatus === 'Resolved'}
-                  isEscalated={task.isEscalated}
+            {/* Completed Care Plan Outcome Feedback Banners */}
+            {carePlans.filter(cp => cp.status === 'Completed').map((cp) => {
+              const fb = (feedbacks || []).find(f => f.carePlanId === cp.id);
+              return (
+                <CarePlanFeedbackBanner
+                  key={`timeline-banner-${cp.id}`}
+                  carePlan={cp}
+                  feedback={fb}
+                  onOpenFeedbackModal={(plan) => {
+                    setSelectedPlanForFeedback(plan);
+                    setSelectedFeedbackToView(null);
+                  }}
+                  onViewFeedbackModal={(plan, fbItem) => {
+                    setSelectedPlanForFeedback(plan);
+                    setSelectedFeedbackToView(fbItem);
+                  }}
                 />
-              ))}
+              );
+            })}
+
+            <div className="space-y-4">
+              {roleTasks.length === 0 ? (
+                <div className="bg-white rounded-2xl p-8 border border-slate-200 text-center shadow-2xs">
+                  <p className="text-sm font-semibold text-slate-700">No Care Plan Tasks Yet</p>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Your doctor has not added diagnostic orders to your active care plan yet.
+                  </p>
+                </div>
+              ) : (
+                roleTasks.map((task) => (
+                  <CarePlanTimeline
+                    key={task.id}
+                    currentStatus={task.taskStatus}
+                    taskTitle={task.title}
+                    hasReport={!!task.report}
+                    isVerified={task.report?.verificationStatus === 'Verified'}
+                    isReviewed={task.taskStatus === 'Resolved'}
+                    isEscalated={task.isEscalated}
+                  />
+                ))
+              )}
             </div>
           </div>
         )}
@@ -226,47 +289,56 @@ export const PatientDashboardPage: React.FC = () => {
             </div>
 
             <div className="space-y-3">
-              {roleTasks.map((task) => (
-                <div
-                  key={task.id}
-                  className="bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4"
-                >
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-bold text-slate-900">{task.title}</span>
-                      <StatusBadge status={task.taskStatus} size="sm" />
-                    </div>
-                    {task.report ? (
-                      <p className="text-xs text-slate-600 flex items-center gap-1.5">
-                        <FileText className="w-3.5 h-3.5 text-teal-600" />
-                        <span>{task.report.fileName} • {task.report.fileSize}</span>
-                        <span className="text-slate-400">
-                          (Uploaded {new Date(task.report.uploadedAt).toLocaleDateString()})
-                        </span>
-                      </p>
-                    ) : (
-                      <p className="text-xs text-slate-400">No document uploaded yet</p>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setSelectedTaskForDetails(task)}
-                      className="px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs font-semibold text-slate-700 transition-colors"
-                    >
-                      View Details
-                    </button>
-                    {!task.report && task.taskStatus !== 'Resolved' && (
-                      <button
-                        onClick={() => setSelectedTaskForUpload(task)}
-                        className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-2xs"
-                      >
-                        <UploadCloud className="w-3.5 h-3.5" /> Upload File
-                      </button>
-                    )}
-                  </div>
+              {roleTasks.length === 0 ? (
+                <div className="bg-white rounded-2xl p-8 border border-slate-200 text-center shadow-2xs">
+                  <p className="text-sm font-semibold text-slate-700">No Reports Available</p>
+                  <p className="text-xs text-slate-400 mt-1">
+                    When diagnostic tests are ordered, you can upload lab documents and view results here.
+                  </p>
                 </div>
-              ))}
+              ) : (
+                roleTasks.map((task) => (
+                  <div
+                    key={task.id}
+                    className="bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold text-slate-900">{task.title}</span>
+                        <StatusBadge status={task.taskStatus} size="sm" />
+                      </div>
+                      {task.report ? (
+                        <p className="text-xs text-slate-600 flex items-center gap-1.5">
+                          <FileText className="w-3.5 h-3.5 text-teal-600" />
+                          <span>{task.report.fileName} • {task.report.fileSize}</span>
+                          <span className="text-slate-400">
+                            (Uploaded {new Date(task.report.uploadedAt).toLocaleDateString()})
+                          </span>
+                        </p>
+                      ) : (
+                        <p className="text-xs text-slate-400">No document uploaded yet</p>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setSelectedTaskForDetails(task)}
+                        className="px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs font-semibold text-slate-700 transition-colors"
+                      >
+                        View Details
+                      </button>
+                      {!task.report && task.taskStatus !== 'Resolved' && (
+                        <button
+                          onClick={() => setSelectedTaskForUpload(task)}
+                          className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-2xs"
+                        >
+                          <UploadCloud className="w-3.5 h-3.5" /> Upload File
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         )}
@@ -305,6 +377,21 @@ export const PatientDashboardPage: React.FC = () => {
             await actions.recordDelayReason(taskId, reason, notes);
             addToast('info', 'Note Recorded', 'Your care coordinator has been notified.');
           }}
+        />
+      )}
+
+      {selectedPlanForFeedback && (
+        <PatientFeedbackModal
+          isOpen={true}
+          carePlan={selectedPlanForFeedback}
+          patientName={currentPatient.fullName}
+          patientId={patientId}
+          existingFeedback={selectedFeedbackToView}
+          onClose={() => {
+            setSelectedPlanForFeedback(null);
+            setSelectedFeedbackToView(null);
+          }}
+          onSubmit={handleFeedbackSubmit}
         />
       )}
 

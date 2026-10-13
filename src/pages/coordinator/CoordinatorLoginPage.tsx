@@ -37,11 +37,11 @@ export const CoordinatorLoginPage: React.FC = () => {
       }
 
       setDemoUser({
-        id: 'coord-' + Date.now(),
+        id: '22222222-2222-4222-a222-222222222222',
         role: 'coordinator',
         status: email.includes('pending') ? 'pending' : 'active',
-        full_name: 'Ananya Desai',
-        email: email || 'ananya@hospital.com',
+        full_name: 'Nida Ali',
+        email: email || 'nida.ali@careloop-health.org',
       });
 
       navigate('/coordinator/dashboard');

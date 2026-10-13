@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Patient, CareTask } from '../../types';
+import { Patient, CareTask, CarePlan, PatientFeedback } from '../../types';
+import { CarePlanFeedbackBanner } from '../feedback/CarePlanFeedbackBanner';
 import { 
   Calendar, 
   MapPin, 
@@ -18,30 +19,38 @@ import {
 interface PatientDashboardProps {
   patient: Patient;
   tasks: CareTask[];
+  carePlans?: CarePlan[];
+  feedbacks?: PatientFeedback[];
   onOpenTaskDetails: (task: CareTask) => void;
   onOpenUpload: (task: CareTask) => void;
   onOpenHelpModal: (task: CareTask) => void;
+  onOpenFeedbackModal?: (carePlan: CarePlan) => void;
+  onViewFeedbackModal?: (carePlan: CarePlan, feedback: PatientFeedback) => void;
 }
 
 export const PatientDashboard: React.FC<PatientDashboardProps> = ({
   patient,
   tasks,
+  carePlans = [],
+  feedbacks = [],
   onOpenTaskDetails,
   onOpenUpload,
-  onOpenHelpModal
+  onOpenHelpModal,
+  onOpenFeedbackModal,
+  onViewFeedbackModal
 }) => {
   const [filter, setFilter] = useState<string>('all');
   const [isFilterOpen, setIsFilterOpen] = useState<boolean>(false);
 
   // Identify the Next Step Task
-  // Prioritize: 1. Overdue task, 2. task-sk-1 if not resolved, 3. In Progress (report submitted), 4. Verified (awaiting doctor), 5. Pending, 6. First task
+  // Prioritize: 1. Overdue task, 2. task-sk-1 or HbA1c pending, 3. In Progress (report submitted), 4. Verified (awaiting doctor), 5. Pending, 6. First task
   const overdueTask = tasks.find(t => t.taskStatus === 'Overdue');
   const primaryTask = overdueTask 
-    || tasks.find(t => t.id === 'task-sk-1' && t.taskStatus !== 'Resolved')
+    || tasks.find(t => (t.id === 'task-sk-1' || t.title.toLowerCase().includes('hba1c')) && t.taskStatus !== 'Resolved')
     || tasks.find(t => t.taskStatus === 'In Progress')
     || tasks.find(t => t.taskStatus === 'Verified')
     || tasks.find(t => t.taskStatus === 'Pending')
-    || tasks.find(t => t.id === 'task-sk-1')
+    || tasks.find(t => t.id === 'task-sk-1' || t.title.toLowerCase().includes('hba1c'))
     || tasks[0];
   const isOverdue = tasks.some(t => t.taskStatus === 'Overdue');
 
@@ -226,9 +235,32 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({
       {/* 2. Main Two-Column Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* ======================================================== */}
-        {/* LEFT COLUMN: Your Next Step + All Your Tasks */}
+        {/* LEFT COLUMN: Feedback Prompt + Your Next Step + Tasks */}
         {/* ======================================================== */}
         <div className="lg:col-span-7 space-y-6">
+          {/* Completed Care Plan Feedback Prompt Banners (Closed-Loop Care) */}
+          {(() => {
+            const patientPlans = carePlans.filter(cp => 
+              cp.patientId === patient.id || 
+              cp.patientId === patient.userId ||
+              cp.patientName?.toLowerCase() === patient.fullName?.toLowerCase()
+            );
+            const completedPlans = patientPlans.filter(cp => cp.status === 'Completed');
+
+            return completedPlans.map((plan) => {
+              const fb = feedbacks.find(f => f.carePlanId === plan.id);
+              return (
+                <CarePlanFeedbackBanner
+                  key={`feedback-banner-${plan.id}`}
+                  carePlan={plan}
+                  feedback={fb}
+                  onOpenFeedbackModal={onOpenFeedbackModal || (() => {})}
+                  onViewFeedbackModal={onViewFeedbackModal}
+                />
+              );
+            });
+          })()}
+
           {/* Card: Your Next Step */}
           {primaryTask && (
             <div className="rounded-3xl border border-amber-200/90 bg-[#fffdf8] p-6 shadow-2xs">
@@ -466,32 +498,38 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({
             </div>
 
             {/* Task rows */}
-            <div className="divide-y divide-slate-100">
-              {filteredTasks.map((t) => (
-                <div
-                  key={t.id}
-                  onClick={() => onOpenTaskDetails(t)}
-                  className="py-3.5 flex items-center justify-between gap-3 hover:bg-slate-50/80 px-2 rounded-xl cursor-pointer transition-colors group"
-                >
-                  <div className="flex items-center gap-3.5 min-w-0">
-                    {getTaskIcon(t.title)}
-                    <div className="min-w-0">
-                      <h4 className="text-sm font-bold text-[#0f172a] truncate group-hover:text-[#1b64f2] transition-colors">
-                        {t.title}
-                      </h4>
-                      <p className="text-xs text-slate-400 font-medium mt-0.5">
-                        Due: {new Date(t.deadline).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
-                      </p>
+            {filteredTasks.length === 0 ? (
+              <div className="py-8 text-center text-xs text-slate-400">
+                No care tasks found for this filter.
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {filteredTasks.map((t) => (
+                  <div
+                    key={t.id}
+                    onClick={() => onOpenTaskDetails(t)}
+                    className="py-3.5 flex items-center justify-between gap-3 hover:bg-slate-50/80 px-2 rounded-xl cursor-pointer transition-colors group"
+                  >
+                    <div className="flex items-center gap-3.5 min-w-0">
+                      {getTaskIcon(t.title)}
+                      <div className="min-w-0">
+                        <h4 className="text-sm font-bold text-[#0f172a] truncate group-hover:text-[#1b64f2] transition-colors">
+                          {t.title}
+                        </h4>
+                        <p className="text-xs text-slate-400 font-medium mt-0.5">
+                          Due: {new Date(t.deadline).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 shrink-0">
+                      {getStatusBadge(t)}
+                      <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition-colors" />
                     </div>
                   </div>
-
-                  <div className="flex items-center gap-3 shrink-0">
-                    {getStatusBadge(t)}
-                    <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition-colors" />
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 

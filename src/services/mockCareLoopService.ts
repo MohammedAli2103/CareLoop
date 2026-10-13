@@ -9,7 +9,10 @@ import {
   TestResult,
   NextAction,
   DelayReason,
-  TaskType
+  TaskType,
+  PatientFeedback,
+  SubmitFeedbackPayload,
+  ReviewFeedbackPayload
 } from '../types';
 import { 
   INITIAL_CARE_PLANS, 
@@ -17,16 +20,19 @@ import {
   INITIAL_TASKS, 
   INITIAL_USERS, 
   INITIAL_NOTIFICATIONS, 
-  INITIAL_AUDIT_LOGS 
+  INITIAL_AUDIT_LOGS,
+  INITIAL_FEEDBACKS,
+  CARE_PLAN_UUID_MAP
 } from '../data/mockData';
 
-class MockCareLoopService {
+export class MockCareLoopService {
   private users: User[] = [...INITIAL_USERS];
   private patients: Patient[] = [...INITIAL_PATIENTS];
   private carePlans: CarePlan[] = [...INITIAL_CARE_PLANS];
   private tasks: CareTask[] = [...INITIAL_TASKS];
   private notifications: NotificationItem[] = [...INITIAL_NOTIFICATIONS];
   private auditLogs: AuditLog[] = [...INITIAL_AUDIT_LOGS];
+  private feedbacks: PatientFeedback[] = [...INITIAL_FEEDBACKS];
   private listeners: (() => void)[] = [];
 
   constructor() {
@@ -40,6 +46,7 @@ class MockCareLoopService {
       localStorage.setItem('careloop_v2_notifications', JSON.stringify(this.notifications));
       localStorage.setItem('careloop_v2_auditlogs', JSON.stringify(this.auditLogs));
       localStorage.setItem('careloop_v2_patients', JSON.stringify(this.patients));
+      localStorage.setItem('careloop_v2_feedbacks', JSON.stringify(this.feedbacks));
     } catch {
       // ignore storage error in case of restricted sandbox
     }
@@ -53,12 +60,14 @@ class MockCareLoopService {
       const storedNotifs = localStorage.getItem('careloop_v2_notifications');
       const storedLogs = localStorage.getItem('careloop_v2_auditlogs');
       const storedPatients = localStorage.getItem('careloop_v2_patients');
+      const storedFeedbacks = localStorage.getItem('careloop_v2_feedbacks');
 
       if (storedTasks) this.tasks = JSON.parse(storedTasks);
       if (storedPlans) this.carePlans = JSON.parse(storedPlans);
       if (storedNotifs) this.notifications = JSON.parse(storedNotifs);
       if (storedLogs) this.auditLogs = JSON.parse(storedLogs);
       if (storedPatients) this.patients = JSON.parse(storedPatients);
+      if (storedFeedbacks) this.feedbacks = JSON.parse(storedFeedbacks);
     } catch {
       // fallback to in-memory initial values
     }
@@ -890,9 +899,11 @@ class MockCareLoopService {
       localStorage.removeItem('careloop_v2_notifications');
       localStorage.removeItem('careloop_v2_auditlogs');
       localStorage.removeItem('careloop_v2_patients');
+      localStorage.removeItem('careloop_v2_feedbacks');
     } catch {
       // ignore
     }
+    this.feedbacks = [...INITIAL_FEEDBACKS];
     this.notify();
   }
 
@@ -912,6 +923,258 @@ class MockCareLoopService {
       return n;
     });
     this.saveToStorage();
+  }
+
+  // ==============================================================================
+  // PATIENT FEEDBACK & CLOSED-LOOP CARE METHODS
+  // ==============================================================================
+
+  public getFeedbacks(): PatientFeedback[] {
+    return [...this.feedbacks];
+  }
+
+  public getFeedbackByCarePlanId(carePlanId: string): PatientFeedback | undefined {
+    const targetCarePlanId = CARE_PLAN_UUID_MAP[carePlanId] || carePlanId;
+    return this.feedbacks.find(f => f.carePlanId === carePlanId || f.carePlanId === targetCarePlanId);
+  }
+
+  public getFeedbacksForPatient(patientId: string): PatientFeedback[] {
+    return this.feedbacks.filter(f => f.patientId === patientId);
+  }
+
+  public getDoctorFeedbackQueue(doctorId?: string): PatientFeedback[] {
+    if (!doctorId) return [...this.feedbacks];
+    const doctorPlanIds = new Set(this.carePlans.filter(cp => cp.doctorId === doctorId).map(cp => cp.id));
+    return this.feedbacks.filter(f => doctorPlanIds.has(f.carePlanId));
+  }
+
+  public submitPatientFeedback(payload: SubmitFeedbackPayload): PatientFeedback {
+    const targetCarePlanId = CARE_PLAN_UUID_MAP[payload.carePlanId] || payload.carePlanId;
+    const plan = this.carePlans.find(cp => 
+      cp.id === payload.carePlanId || 
+      cp.id === targetCarePlanId ||
+      CARE_PLAN_UUID_MAP[cp.id] === payload.carePlanId ||
+      CARE_PLAN_UUID_MAP[cp.id] === targetCarePlanId
+    );
+    if (!plan) {
+      throw new Error('Care plan not found.');
+    }
+
+    // Validate care plan completion status
+    if (plan.status !== 'Completed') {
+      throw new Error('Feedback can only be submitted once the care plan has reached its completed state.');
+    }
+
+    // Determine patient ID from payload or fallback to plan's patient ID
+    const patientId = payload.patientId || plan.patientId;
+
+    // Prevent duplicate submission for same care plan
+    const existing = this.feedbacks.find(f => f.carePlanId === payload.carePlanId || f.carePlanId === targetCarePlanId);
+    if (existing) {
+      throw new Error('Feedback has already been submitted for this care plan.');
+    }
+
+    // Validate rating
+    if (!payload.experienceRating || payload.experienceRating < 1 || payload.experienceRating > 5) {
+      throw new Error('Care experience rating must be between 1 and 5 stars.');
+    }
+
+    // Validate comments length
+    if (payload.comments && payload.comments.length > 3000) {
+      throw new Error('Additional comments cannot exceed 3,000 characters.');
+    }
+
+    // Validate enum values
+    const validImprovements = ['much_better', 'somewhat_better', 'no_change', 'worse_than_before'];
+    if (!validImprovements.includes(payload.improvementStatus)) {
+      throw new Error('Invalid improvement status value.');
+    }
+
+    const validAdherence = ['followed_all', 'followed_some', 'partially', 'unable_to_follow'];
+    if (!validAdherence.includes(payload.adherenceStatus)) {
+      throw new Error('Invalid adherence status value.');
+    }
+
+    const validBarriers = ['no_difficulties', 'none', 'cost', 'travel_or_access', 'side_effects', 'unclear_instructions', 'other'];
+    if (!validBarriers.includes(payload.barrierType)) {
+      throw new Error('Invalid barrier type value.');
+    }
+
+    // Normalize adherence and barrier for storage consistency
+    const normalizedAdherence = payload.adherenceStatus === 'partially' ? 'followed_some' : payload.adherenceStatus;
+    const normalizedBarrier = payload.barrierType === 'none' ? 'no_difficulties' : payload.barrierType;
+
+    // Determine initial review status
+    // Safety rule: worsening symptoms or deteriorating progress automatically flags for clinical action
+    const isWorsening = payload.worseningReported || payload.improvementStatus === 'worse_than_before';
+    const hasAdherenceProblem = normalizedAdherence === 'unable_to_follow';
+    const hasBarriers = normalizedBarrier !== 'no_difficulties';
+    const isLowRating = payload.experienceRating <= 2;
+
+    const reviewStatus: 'action_required' | 'pending' = (isWorsening || hasAdherenceProblem || hasBarriers || isLowRating)
+      ? 'action_required'
+      : 'pending';
+
+    const patient = this.patients.find(p => p.id === patientId || p.userId === patientId);
+
+    const newFeedback: PatientFeedback = {
+      id: `fb-${Date.now()}`,
+      patientId,
+      patientName: patient?.fullName || plan.patientName,
+      patientMrn: patient?.mrn || 'PT-UNKNOWN',
+      carePlanId: targetCarePlanId || payload.carePlanId,
+      carePlanTitle: plan.title,
+      carePlanDiagnosis: plan.diagnosis,
+      improvementStatus: payload.improvementStatus,
+      adherenceStatus: payload.adherenceStatus,
+      barrierType: payload.barrierType,
+      barrierOtherDetails: payload.barrierOtherDetails,
+      experienceRating: payload.experienceRating,
+      comments: payload.comments?.trim() || undefined,
+      worseningReported: payload.worseningReported,
+      worseningDetails: payload.worseningDetails?.trim() || undefined,
+      safetyAcknowledged: payload.safetyAcknowledged,
+      reviewStatus,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    this.feedbacks.unshift(newFeedback);
+
+    // Notify doctor
+    this.notifications.unshift({
+      id: `notif-${Date.now()}`,
+      recipientRole: 'doctor',
+      recipientName: plan.doctorName,
+      channel: 'in-app',
+      title: isWorsening ? 'Urgent: Worsening Symptoms in Patient Feedback' : 'New Care Plan Feedback Submitted',
+      message: isWorsening
+        ? `Patient ${newFeedback.patientName} reported worsening symptoms on completed protocol "${plan.title}". Prompt clinical review required.`
+        : `Patient ${newFeedback.patientName} submitted feedback (${newFeedback.experienceRating}/5 stars) for plan "${plan.title}".`,
+      type: isWorsening ? 'escalation' : 'general',
+      isRead: false,
+      sentAt: new Date().toISOString()
+    });
+
+    // Audit log
+    this.auditLogs.unshift({
+      id: `log-${Date.now()}`,
+      actorId: patientId,
+      actorName: newFeedback.patientName || 'Patient',
+      actorRole: 'patient',
+      entityType: 'patient_feedback',
+      entityId: newFeedback.id,
+      action: 'PATIENT_FEEDBACK_SUBMITTED',
+      previousState: 'none',
+      newState: reviewStatus,
+      timestamp: new Date().toISOString(),
+      details: `Patient submitted care plan feedback. Rating: ${newFeedback.experienceRating}/5. Improvement: ${newFeedback.improvementStatus}. Worsening: ${newFeedback.worseningReported}.`
+    });
+
+    this.saveToStorage();
+    return newFeedback;
+  }
+
+  public completeFeedbackReview(
+    feedbackId: string,
+    reviewData: ReviewFeedbackPayload,
+    doctorId?: string
+  ): { feedback: PatientFeedback; followUpTask?: CareTask } {
+    const index = this.feedbacks.findIndex(f => f.id === feedbackId);
+    if (index === -1) {
+      throw new Error('Feedback record not found.');
+    }
+
+    if (!reviewData.doctorResponse || !reviewData.doctorResponse.trim()) {
+      throw new Error('Clinical review notes or doctor response is required before marking review complete.');
+    }
+
+    if (!reviewData.nextAction) {
+      throw new Error('Documented next action is required to close the care loop.');
+    }
+
+    const feedback = this.feedbacks[index];
+    const plan = this.carePlans.find(cp => cp.id === feedback.carePlanId);
+    const doctor = doctorId ? this.users.find(u => u.id === doctorId) : undefined;
+    const doctorName = doctor?.fullName || plan?.doctorName || 'Attending Physician';
+    const resolvedDoctorId = doctorId || plan?.doctorId || 'user-doctor-1';
+
+    let followUpTask: CareTask | undefined;
+
+    // If follow up task is requested, create it
+    if (reviewData.createFollowUpTask && reviewData.followUpTaskDetails) {
+      const details = reviewData.followUpTaskDetails;
+      const deadlineDays = details.deadlineDays || 14;
+      const deadlineDate = new Date();
+      deadlineDate.setDate(deadlineDate.getDate() + deadlineDays);
+      const deadlineStr = deadlineDate.toISOString().split('T')[0];
+
+      followUpTask = {
+        id: `task-followup-${Date.now()}`,
+        carePlanId: feedback.carePlanId,
+        patientId: feedback.patientId,
+        patientName: feedback.patientName || 'Patient',
+        doctorId: resolvedDoctorId,
+        doctorName: doctorName,
+        title: details.title,
+        taskType: details.taskType,
+        deadline: deadlineStr,
+        assignedRole: 'patient',
+        taskStatus: 'Pending',
+        instructions: details.instructions || 'Follow-up order generated following care plan feedback review.',
+        partnerFacility: details.partnerFacility,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      this.tasks.unshift(followUpTask);
+    }
+
+    const updatedFeedback: PatientFeedback = {
+      ...feedback,
+      reviewStatus: 'reviewed',
+      doctorResponse: reviewData.doctorResponse.trim(),
+      reviewedBy: resolvedDoctorId,
+      reviewedByName: doctorName,
+      reviewedAt: new Date().toISOString(),
+      nextAction: reviewData.nextAction,
+      careGapIdentified: reviewData.careGapIdentified?.trim() || undefined,
+      followUpTaskId: followUpTask?.id || feedback.followUpTaskId,
+      updatedAt: new Date().toISOString()
+    };
+
+    this.feedbacks[index] = updatedFeedback;
+
+    // Notify patient of loop closure
+    this.notifications.unshift({
+      id: `notif-${Date.now()}`,
+      recipientRole: 'patient',
+      recipientName: feedback.patientName || 'Patient',
+      channel: 'in-app',
+      title: 'Doctor Reviewed Your Care Plan Feedback',
+      message: `${doctorName} evaluated your recovery feedback: "${updatedFeedback.doctorResponse?.substring(0, 80)}...". Next step: ${updatedFeedback.nextAction}.`,
+      type: 'general',
+      isRead: false,
+      sentAt: new Date().toISOString()
+    });
+
+    // Audit log
+    this.auditLogs.unshift({
+      id: `log-${Date.now()}`,
+      actorId: resolvedDoctorId,
+      actorName: doctorName,
+      actorRole: 'doctor',
+      entityType: 'patient_feedback',
+      entityId: feedback.id,
+      action: 'FEEDBACK_CLINICALLY_REVIEWED',
+      previousState: feedback.reviewStatus,
+      newState: 'reviewed',
+      timestamp: new Date().toISOString(),
+      details: `Doctor closed feedback loop. Next action: ${updatedFeedback.nextAction}. Care gap: ${updatedFeedback.careGapIdentified || 'None noted'}. Follow-up task created: ${followUpTask ? followUpTask.title : 'None'}.`
+    });
+
+    this.saveToStorage();
+    return { feedback: updatedFeedback, followUpTask };
   }
 }
 
