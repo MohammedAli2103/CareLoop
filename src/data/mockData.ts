@@ -1324,9 +1324,131 @@ export const INITIAL_FEEDBACKS: PatientFeedback[] = [
 
 // Mapping legacy or mock care plan string keys to real Supabase UUID records
 export const CARE_PLAN_UUID_MAP: Record<string, string> = {
+  'plan-1': 'a1111111-1111-4111-a111-111111111111',
+  'plan-2': 'a2222222-2222-4222-a222-222222222222',
+  'plan-3': 'a3333333-3333-4333-a333-333333333333',
   'plan-completed-prompt': 'efb53af1-7122-44a9-973c-3b13074f675c',
   'plan-completed-1': 'efb53af1-7122-44a9-973c-3b13074f675c',
+  '44444444-4444-4444-a444-444444444443': '44444444-4444-4444-a444-444444444443',
+  'efb53af1-7122-44a9-973c-3b13074f675c': 'efb53af1-7122-44a9-973c-3b13074f675c',
   'plan-completed-2': '44444444-4444-4444-a444-444444444445',
+  '44444444-4444-4444-a444-444444444445': '44444444-4444-4444-a444-444444444445',
+};
+
+export const REVERSE_CARE_PLAN_UUID_MAP: Record<string, string> = {
+  'a1111111-1111-4111-a111-111111111111': 'plan-1',
+  'a2222222-2222-4222-a222-222222222222': 'plan-2',
+  'a3333333-3333-4333-a333-333333333333': 'plan-3',
+  '44444444-4444-4444-a444-444444444443': '44444444-4444-4444-a444-444444444443',
+  'efb53af1-7122-44a9-973c-3b13074f675c': 'plan-completed-1',
+  '44444444-4444-4444-a444-444444444445': 'plan-completed-2',
+};
+
+// Canonical patient UUID mapping
+export const PATIENT_UUID_MAP: Record<string, string> = {
+  'patient-1': '2bdf2f09-a454-4ff8-b1fd-e1c6cd8a715a',
+  'user-patient-1': '2bdf2f09-a454-4ff8-b1fd-e1c6cd8a715a',
+  '33333333-3333-4333-a333-333333333333': '2bdf2f09-a454-4ff8-b1fd-e1c6cd8a715a',
+  '2bdf2f09-a454-4ff8-b1fd-e1c6cd8a715a': '2bdf2f09-a454-4ff8-b1fd-e1c6cd8a715a',
+
+  'patient-2': '33333333-3333-4333-a333-333333333332',
+  'user-patient-2': '33333333-3333-4333-a333-333333333332',
+  '33333333-3333-4333-a333-333333333332': '33333333-3333-4333-a333-333333333332',
+
+  'patient-3': '33333333-3333-4333-a333-333333333331',
+  'user-patient-3': '33333333-3333-4333-a333-333333333331',
+  '33333333-3333-4333-a333-333333333331': '33333333-3333-4333-a333-333333333331',
+
+  'patient-4': '33333333-3333-4333-a333-333333333334',
+  'user-patient-4': '33333333-3333-4333-a333-333333333334',
+  '33333333-3333-4333-a333-333333333334': '33333333-3333-4333-a333-333333333334',
+
+  'patient-5': '33333333-3333-4333-a333-333333333335',
+  'patient-6': '33333333-3333-4333-a333-333333333336',
+  'patient-7': '33333333-3333-4333-a333-333333333337',
+  'patient-8': '33333333-3333-4333-a333-333333333338',
+  'patient-9': '33333333-3333-4333-a333-333333333339',
+  'patient-10': '33333333-3333-4333-a333-333333333340',
+};
+
+export const REVERSE_PATIENT_UUID_MAP: Record<string, string> = {
+  '2bdf2f09-a454-4ff8-b1fd-e1c6cd8a715a': 'patient-1',
+  '33333333-3333-4333-a333-333333333333': 'patient-1',
+  '33333333-3333-4333-a333-333333333332': 'patient-2',
+  '33333333-3333-4333-a333-333333333331': 'patient-3',
+  '33333333-3333-4333-a333-333333333334': 'patient-4',
+  '33333333-3333-4333-a333-333333333335': 'patient-5',
+  '33333333-3333-4333-a333-333333333336': 'patient-6',
+  '33333333-3333-4333-a333-333333333337': 'patient-7',
+  '33333333-3333-4333-a333-333333333338': 'patient-8',
+  '33333333-3333-4333-a333-333333333339': 'patient-9',
+  '33333333-3333-4333-a333-333333333340': 'patient-10',
+};
+
+// Canonical doctor UUID mapping
+export const DOCTOR_UUID_MAP: Record<string, string> = {
+  'user-doctor-1': '46e9bfad-b991-4ab4-9bcb-a133e0044348',
+  '11111111-1111-4111-a111-111111111111': '46e9bfad-b991-4ab4-9bcb-a133e0044348',
+  '46e9bfad-b991-4ab4-9bcb-a133e0044348': '46e9bfad-b991-4ab4-9bcb-a133e0044348',
+};
+
+export const REVERSE_DOCTOR_UUID_MAP: Record<string, string> = {
+  '46e9bfad-b991-4ab4-9bcb-a133e0044348': 'user-doctor-1',
+  '11111111-1111-4111-a111-111111111111': 'user-doctor-1',
+};
+
+// Canonical coordinator UUID mapping
+export const COORDINATOR_UUID_MAP: Record<string, string> = {
+  'user-coord-1': '2d9f26bb-0116-4dd0-acb4-b88d57e767b6',
+  '22222222-2222-4222-a222-222222222222': '2d9f26bb-0116-4dd0-acb4-b88d57e767b6',
+  '2d9f26bb-0116-4dd0-acb4-b88d57e767b6': '2d9f26bb-0116-4dd0-acb4-b88d57e767b6',
+};
+
+export const REVERSE_COORDINATOR_UUID_MAP: Record<string, string> = {
+  '2d9f26bb-0116-4dd0-acb4-b88d57e767b6': 'user-coord-1',
+  '22222222-2222-4222-a222-222222222222': 'user-coord-1',
+};
+
+// Canonical task UUID mapping
+export const TASK_UUID_MAP: Record<string, string> = {
+  'task-sk-1': 'b1111111-1111-4111-a111-111111111101',
+  'task-sk-2': 'b1111111-1111-4111-a111-111111111102',
+  'task-sk-3': 'b1111111-1111-4111-a111-111111111103',
+  'task-sk-4': 'b1111111-1111-4111-a111-111111111104',
+  'task-sk-5': 'b1111111-1111-4111-a111-111111111105',
+  'task-doc-rev-1': 'b2222222-2222-4222-a222-222222222201',
+  'task-doc-rev-2': 'b2222222-2222-4222-a222-222222222202',
+  'task-doc-rev-3': 'b2222222-2222-4222-a222-222222222203',
+  'task-doc-rev-4': 'b2222222-2222-4222-a222-222222222204',
+  'task-doc-fu-1': 'b3333333-3333-4333-a333-333333333301',
+  'task-doc-fu-2': 'b3333333-3333-4333-a333-333333333302',
+  'task-doc-fu-3': 'b3333333-3333-4333-a333-333333333303',
+  'task-coord-od-1': 'b4444444-4444-4444-a444-444444444401',
+  'task-coord-od-2': 'b4444444-4444-4444-a444-444444444402',
+  'task-coord-od-3': 'b4444444-4444-4444-a444-444444444403',
+  'task-coord-od-4': 'b4444444-4444-4444-a444-444444444404',
+  'task-coord-vf-1': 'b5555555-5555-4555-a555-555555555501',
+  'task-coord-vf-2': 'b5555555-5555-4555-a555-555555555502',
+  'task-coord-vf-3': 'b5555555-5555-4555-a555-555555555503',
+  'task-coord-vf-4': 'b5555555-5555-4555-a555-555555555504',
+  'task-coord-wait-1': 'b6666666-6666-4666-a666-666666666601',
+  'task-coord-wait-2': 'b6666666-6666-4666-a666-666666666602',
+};
+
+export const REVERSE_TASK_UUID_MAP: Record<string, string> = {
+  'b1111111-1111-4111-a111-111111111101': 'task-sk-1',
+  'b1111111-1111-4111-a111-111111111102': 'task-sk-2',
+  'b1111111-1111-4111-a111-111111111103': 'task-sk-3',
+  'b1111111-1111-4111-a111-111111111104': 'task-sk-4',
+  'b1111111-1111-4111-a111-111111111105': 'task-sk-5',
+  'b2222222-2222-4222-a222-222222222201': 'task-doc-rev-1',
+  'b2222222-2222-4222-a222-222222222202': 'task-doc-rev-2',
+  'b2222222-2222-4222-a222-222222222203': 'task-doc-rev-3',
+  'b2222222-2222-4222-a222-222222222204': 'task-doc-rev-4',
+  'b3333333-3333-4333-a333-333333333301': 'task-doc-fu-1',
+  'b4444444-4444-4444-a444-444444444401': 'task-coord-od-1',
+  'b4444444-4444-4444-a444-444444444402': 'task-coord-od-2',
+  'b5555555-5555-4555-a555-555555555501': 'task-coord-vf-1',
 };
 
 // Mapping legacy or mock feedback string IDs to real Supabase UUID records
@@ -1336,3 +1458,34 @@ export const FEEDBACK_UUID_MAP: Record<string, string> = {
 };
 
 export const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function resolvePatientUuid(id: string): string {
+  if (!id) return id;
+  const clean = id.trim();
+  return PATIENT_UUID_MAP[clean] || clean;
+}
+
+export function resolveDoctorUuid(id: string): string {
+  if (!id) return id;
+  const clean = id.trim();
+  return DOCTOR_UUID_MAP[clean] || clean;
+}
+
+export function resolveCarePlanUuid(id: string): string {
+  if (!id) return id;
+  const clean = id.trim();
+  return CARE_PLAN_UUID_MAP[clean] || clean;
+}
+
+export function resolveTaskUuid(id: string): string {
+  if (!id) return id;
+  const clean = id.trim();
+  return TASK_UUID_MAP[clean] || clean;
+}
+
+export function resolveFeedbackUuid(id: string): string {
+  if (!id) return id;
+  const clean = id.trim();
+  return FEEDBACK_UUID_MAP[clean] || clean;
+}
+

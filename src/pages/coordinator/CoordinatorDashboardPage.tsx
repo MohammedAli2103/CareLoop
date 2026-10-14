@@ -52,6 +52,18 @@ export const CoordinatorDashboardPage: React.FC = () => {
     actions
   } = useCareLoop('coordinator');
 
+  const coordinatorUser = React.useMemo(() => {
+    if (profile) {
+      return {
+        ...currentUser,
+        id: profile.id,
+        fullName: profile.full_name || currentUser.fullName,
+        email: profile.email || currentUser.email
+      };
+    }
+    return currentUser;
+  }, [profile, currentUser]);
+
   const handleVerifySuccess = async (taskId: string, results: TestResult[], notes: string) => {
     try {
       const updated = await actions.verifyReport(taskId, results, notes);
@@ -176,7 +188,7 @@ export const CoordinatorDashboardPage: React.FC = () => {
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
         <CoordinatorDashboard
-          coordinator={currentUser}
+          coordinator={coordinatorUser}
           tasks={allTasks}
           onOpenTaskDetails={setSelectedTaskForDetails}
           onOpenVerify={setSelectedTaskForVerify}

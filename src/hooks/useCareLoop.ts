@@ -19,6 +19,9 @@ import {
   SubmitFeedbackPayload,
   ReviewFeedbackPayload
 } from '../types';
+import {
+  resolvePatientUuid
+} from '../data/mockData';
 
 export function useCareLoop(activeRole: UserRole, activePatientId = 'patient-1') {
   const [users, setUsers] = useState<User[]>(() => careLoopService.getUsers());
@@ -87,47 +90,39 @@ export function useCareLoop(activeRole: UserRole, activePatientId = 'patient-1')
     };
   }, [refreshData]);
 
-const DEMO_PATIENT_UUID_MAP: Record<string, string> = {
-  'patient-1': '33333333-3333-4333-a333-333333333333',
-  'patient-2': '33333333-3333-4333-a333-333333333332',
-  'patient-3': '33333333-3333-4333-a333-333333333331',
-  '33333333-3333-4333-a333-333333333333': 'patient-1',
-  '33333333-3333-4333-a333-333333333332': 'patient-2',
-  '33333333-3333-4333-a333-333333333331': 'patient-3',
-};
-
   // Filter tasks for active role
   const roleTasks = useMemo(() => {
     if (activeRole === 'patient') {
       const targetId = activePatientId || (patients[0]?.id ?? 'patient-1');
-      const alternateId = DEMO_PATIENT_UUID_MAP[targetId];
+      const canonicalTarget = resolvePatientUuid(targetId);
 
-      const filtered = allTasks.filter(t => 
-        t.patientId === targetId || 
-        (alternateId && t.patientId === alternateId)
-      );
+      const filtered = allTasks.filter(t => {
+        const canonicalTaskPatient = resolvePatientUuid(t.patientId);
+        return (
+          t.patientId === targetId ||
+          t.patientId === canonicalTarget ||
+          canonicalTaskPatient === targetId ||
+          canonicalTaskPatient === canonicalTarget
+        );
+      });
 
       // If active patient has tasks, return them
       if (filtered.length > 0) return filtered;
 
-      // If active patient has no tasks (e.g. demo session with unassigned ID),
-      // fallback to the primary demo patient (Sarah Khan) tasks so dashboard is populated
-      if (
+      // Fallback to Sarah Khan tasks if viewing demo patient 1
+      const isSarah = 
         targetId === 'patient-1' || 
+        targetId === '2bdf2f09-a454-4ff8-b1fd-e1c6cd8a715a' ||
+        targetId === '33333333-3333-4333-a333-333333333333' ||
         targetId === patients[0]?.id || 
-        !activePatientId || 
-        targetId.startsWith('patient-') ||
-        targetId === '33333333-3333-4333-a333-333333333333'
-      ) {
-        const firstPatientId = patients[0]?.id || '33333333-3333-4333-a333-333333333333';
-        const firstPatientAlt = DEMO_PATIENT_UUID_MAP[firstPatientId];
-        const fallbackTasks = allTasks.filter(t => 
-          t.patientId === firstPatientId || 
-          (firstPatientAlt && t.patientId === firstPatientAlt) ||
-          t.patientId === '33333333-3333-4333-a333-333333333333' ||
-          t.patientId === 'patient-1'
-        );
-        if (fallbackTasks.length > 0) return fallbackTasks;
+        !activePatientId;
+
+      if (isSarah) {
+        const sarahTasks = allTasks.filter(t => {
+          const c = resolvePatientUuid(t.patientId);
+          return c === '2bdf2f09-a454-4ff8-b1fd-e1c6cd8a715a' || t.patientId === 'patient-1';
+        });
+        if (sarahTasks.length > 0) return sarahTasks;
       }
 
       return filtered;
@@ -137,27 +132,31 @@ const DEMO_PATIENT_UUID_MAP: Record<string, string> = {
 
   const currentPatient = useMemo(() => {
     const targetId = activePatientId || 'patient-1';
-    const altId = DEMO_PATIENT_UUID_MAP[targetId];
+    const canonicalTarget = resolvePatientUuid(targetId);
 
     return (
-      patients.find(p => p.id === targetId || p.userId === targetId) ||
-      (altId ? patients.find(p => p.id === altId || p.userId === altId) : undefined) ||
+      patients.find(p => 
+        p.id === targetId || 
+        p.userId === targetId || 
+        resolvePatientUuid(p.id) === canonicalTarget ||
+        resolvePatientUuid(p.userId) === canonicalTarget
+      ) ||
       patients[0] ||
       {
-        id: 'patient-1',
-        userId: 'patient-1',
-        mrn: 'MRN-84920',
+        id: '2bdf2f09-a454-4ff8-b1fd-e1c6cd8a715a',
+        userId: '2bdf2f09-a454-4ff8-b1fd-e1c6cd8a715a',
+        mrn: 'PT-84920',
         fullName: 'Sarah Khan',
-        dateOfBirth: '1989-06-14',
-        age: 37,
+        dateOfBirth: '2003-04-14',
+        age: 23,
         gender: 'Female',
-        phone: '+91 91234 56789',
+        phone: '+1 (555) 876-5432',
         email: 'sarah.khan@careloop.io',
-        emergencyContact: 'Tariq Khan (Spouse - +91 91234 56780)',
-        primaryDiagnosis: 'Type 2 Diabetes Mellitus with Dyslipidemia',
-        assignedDoctorId: '11111111-1111-4111-a111-111111111111',
-        assignedDoctorName: 'Dr. Arjun Mehta, MD',
-        bloodGroup: 'B+'
+        emergencyContact: 'Tariq Khan (Brother) - +1 (555) 876-5433',
+        primaryDiagnosis: 'Prediabetes & Metabolic Evaluation',
+        assignedDoctorId: '46e9bfad-b991-4ab4-9bcb-a133e0044348',
+        assignedDoctorName: 'Dr. Arjun Mehta',
+        bloodGroup: 'A+'
       }
     );
   }, [patients, activePatientId]);
@@ -173,8 +172,14 @@ const DEMO_PATIENT_UUID_MAP: Record<string, string> = {
     const activePlans = carePlans.filter(p => p.status === 'Active').length;
     const pending = allTasks.filter(t => t.taskStatus === 'Pending').length;
     const inProgress = allTasks.filter(t => t.taskStatus === 'In Progress').length;
-    const verified = allTasks.filter(t => t.taskStatus === 'Verified').length;
-    const overdue = allTasks.filter(t => t.taskStatus === 'Overdue').length;
+    const verified = allTasks.filter(t => 
+      (t.taskStatus === 'Verified' || (t.report && t.report.verificationStatus === 'Verified')) && 
+      t.taskStatus !== 'Resolved'
+    ).length;
+    const overdue = allTasks.filter(t => 
+      t.taskStatus === 'Overdue' || 
+      (t.taskStatus !== 'Resolved' && new Date(t.deadline).getTime() < new Date('2026-10-13').getTime())
+    ).length;
     const resolved = allTasks.filter(t => t.taskStatus === 'Resolved').length;
 
     return {
@@ -211,6 +216,7 @@ const DEMO_PATIENT_UUID_MAP: Record<string, string> = {
               await refreshData();
               return res;
             }
+            throw new Error('Database operation failed while creating care plan.');
           }
           const res = careLoopService.createCarePlan(data);
           await refreshData();
@@ -236,6 +242,7 @@ const DEMO_PATIENT_UUID_MAP: Record<string, string> = {
               await refreshData();
               return res;
             }
+            throw new Error('Database operation failed while uploading diagnostic report.');
           }
           const res = careLoopService.uploadReport(taskId, fileData);
           await refreshData();
@@ -254,6 +261,7 @@ const DEMO_PATIENT_UUID_MAP: Record<string, string> = {
               await refreshData();
               return res;
             }
+            throw new Error('Database operation failed while verifying diagnostic report.');
           }
           const res = careLoopService.verifyReport(taskId, results, notes);
           await refreshData();
@@ -272,6 +280,7 @@ const DEMO_PATIENT_UUID_MAP: Record<string, string> = {
               await refreshData();
               return res;
             }
+            throw new Error('Database operation failed while flagging diagnostic report.');
           }
           const res = careLoopService.flagReportForCorrection(taskId, reason);
           await refreshData();
@@ -285,6 +294,7 @@ const DEMO_PATIENT_UUID_MAP: Record<string, string> = {
         reviewNotes: string;
         nextAction: NextAction;
         followUpDate?: string;
+        doctorName?: string;
       }) => {
         setLoading(true);
         try {
@@ -294,6 +304,7 @@ const DEMO_PATIENT_UUID_MAP: Record<string, string> = {
               await refreshData();
               return res;
             }
+            throw new Error('Database operation failed while recording clinical evaluation.');
           }
           const res = careLoopService.completeDoctorReview(taskId, data);
           await refreshData();
@@ -310,6 +321,7 @@ const DEMO_PATIENT_UUID_MAP: Record<string, string> = {
             await refreshData();
             return res;
           }
+          throw new Error('Database operation failed while recording patient delay barrier.');
         }
         const res = careLoopService.recordDelayReason(taskId, reason, notes);
         await refreshData();

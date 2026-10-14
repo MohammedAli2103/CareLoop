@@ -22,8 +22,43 @@ import {
   INITIAL_NOTIFICATIONS, 
   INITIAL_AUDIT_LOGS,
   INITIAL_FEEDBACKS,
-  CARE_PLAN_UUID_MAP
+  CARE_PLAN_UUID_MAP,
+  resolvePatientUuid,
+  resolveDoctorUuid,
+  resolveCarePlanUuid,
+  resolveTaskUuid
 } from '../data/mockData';
+
+function safeGetItem(key: string): string | null {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      return window.localStorage.getItem(key);
+    }
+  } catch {
+    // fallback
+  }
+  return null;
+}
+
+function safeSetItem(key: string, value: string): void {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem(key, value);
+    }
+  } catch {
+    // fallback
+  }
+}
+
+function safeRemoveItem(key: string): void {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.removeItem(key);
+    }
+  } catch {
+    // fallback
+  }
+}
 
 export class MockCareLoopService {
   private users: User[] = [...INITIAL_USERS];
@@ -40,27 +75,23 @@ export class MockCareLoopService {
   }
 
   private saveToStorage() {
-    try {
-      localStorage.setItem('careloop_v2_tasks', JSON.stringify(this.tasks));
-      localStorage.setItem('careloop_v2_careplans', JSON.stringify(this.carePlans));
-      localStorage.setItem('careloop_v2_notifications', JSON.stringify(this.notifications));
-      localStorage.setItem('careloop_v2_auditlogs', JSON.stringify(this.auditLogs));
-      localStorage.setItem('careloop_v2_patients', JSON.stringify(this.patients));
-      localStorage.setItem('careloop_v2_feedbacks', JSON.stringify(this.feedbacks));
-    } catch {
-      // ignore storage error in case of restricted sandbox
-    }
+    safeSetItem('careloop_v2_tasks', JSON.stringify(this.tasks));
+    safeSetItem('careloop_v2_careplans', JSON.stringify(this.carePlans));
+    safeSetItem('careloop_v2_notifications', JSON.stringify(this.notifications));
+    safeSetItem('careloop_v2_auditlogs', JSON.stringify(this.auditLogs));
+    safeSetItem('careloop_v2_patients', JSON.stringify(this.patients));
+    safeSetItem('careloop_v2_feedbacks', JSON.stringify(this.feedbacks));
     this.notify();
   }
 
   private loadFromStorage() {
     try {
-      const storedTasks = localStorage.getItem('careloop_v2_tasks');
-      const storedPlans = localStorage.getItem('careloop_v2_careplans');
-      const storedNotifs = localStorage.getItem('careloop_v2_notifications');
-      const storedLogs = localStorage.getItem('careloop_v2_auditlogs');
-      const storedPatients = localStorage.getItem('careloop_v2_patients');
-      const storedFeedbacks = localStorage.getItem('careloop_v2_feedbacks');
+      const storedTasks = safeGetItem('careloop_v2_tasks');
+      const storedPlans = safeGetItem('careloop_v2_careplans');
+      const storedNotifs = safeGetItem('careloop_v2_notifications');
+      const storedLogs = safeGetItem('careloop_v2_auditlogs');
+      const storedPatients = safeGetItem('careloop_v2_patients');
+      const storedFeedbacks = safeGetItem('careloop_v2_feedbacks');
 
       if (storedTasks) this.tasks = JSON.parse(storedTasks);
       if (storedPlans) this.carePlans = JSON.parse(storedPlans);
@@ -94,7 +125,8 @@ export class MockCareLoopService {
   }
 
   public getPatientById(id: string): Patient | undefined {
-    return this.patients.find(p => p.id === id);
+    const resolved = resolvePatientUuid(id);
+    return this.patients.find(p => p.id === id || p.id === resolved || resolvePatientUuid(p.id) === resolved);
   }
 
   public getCarePlans(): CarePlan[] {
@@ -102,7 +134,8 @@ export class MockCareLoopService {
   }
 
   public getCarePlanById(id: string): CarePlan | undefined {
-    return this.carePlans.find(cp => cp.id === id);
+    const resolved = resolveCarePlanUuid(id);
+    return this.carePlans.find(cp => cp.id === id || cp.id === resolved || resolveCarePlanUuid(cp.id) === resolved);
   }
 
   public getTasks(): CareTask[] {
@@ -110,13 +143,20 @@ export class MockCareLoopService {
   }
 
   public getTaskById(id: string): CareTask | undefined {
-    return this.tasks.find(t => t.id === id);
+    const resolved = resolveTaskUuid(id);
+    return this.tasks.find(t => t.id === id || t.id === resolved || resolveTaskUuid(t.id) === resolved);
   }
 
   public getTasksForRole(role: UserRole, patientId?: string): CareTask[] {
     if (role === 'patient') {
       const activePatientId = patientId || 'patient-1';
-      return this.tasks.filter(t => t.patientId === activePatientId);
+      const resolvedTarget = resolvePatientUuid(activePatientId);
+      return this.tasks.filter(t => 
+        t.patientId === activePatientId || 
+        t.patientId === resolvedTarget ||
+        resolvePatientUuid(t.patientId) === resolvedTarget ||
+        resolvePatientUuid(t.patientId) === activePatientId
+      );
     }
     return this.tasks;
   }
@@ -144,9 +184,13 @@ export class MockCareLoopService {
     fastingRequired: boolean;
     partnerFacility: string;
     instructions: string;
-  }): { carePlan: CarePlan; task: CareTask } {
-    const patient = this.patients.find(p => p.id === params.patientId) || this.patients[0];
-    const doctor = this.users.find(u => u.id === params.doctorId) || this.users[1];
+  }): { carePlan: CarePlan; task: CareTask } | null {
+    const resolvedPatient = resolvePatientUuid(params.patientId);
+    const patient = this.patients.find(p => p.id === params.patientId || p.id === resolvedPatient || resolvePatientUuid(p.id) === resolvedPatient);
+    if (!patient) return null;
+
+    const resolvedDoctor = resolveDoctorUuid(params.doctorId);
+    const doctor = this.users.find(u => u.id === params.doctorId || u.id === resolvedDoctor || resolveDoctorUuid(u.id) === resolvedDoctor) || this.users[1];
 
     const planId = `plan-${Date.now()}`;
     const taskId = `task-${Date.now()}`;
@@ -241,7 +285,8 @@ export class MockCareLoopService {
     fileType: string;
     mockResults?: TestResult[];
   }): CareTask | null {
-    const taskIndex = this.tasks.findIndex(t => t.id === taskId);
+    const resolvedId = resolveTaskUuid(taskId);
+    const taskIndex = this.tasks.findIndex(t => t.id === taskId || t.id === resolvedId || resolveTaskUuid(t.id) === resolvedId);
     if (taskIndex === -1) return null;
 
     const task = this.tasks[taskIndex];
@@ -400,8 +445,9 @@ export class MockCareLoopService {
   }
 
   // 3. Coordinator Verifies Report (Side-by-side audit completed -> VERIFIED)
-  public verifyReport(taskId: string, verifiedResults: TestResult[], notes: string): CareTask | null {
-    const taskIndex = this.tasks.findIndex(t => t.id === taskId);
+  public verifyReport(taskId: string, verifiedResults: TestResult[], notes: string, coordinatorName = 'Nida Ali (Care Coordinator)'): CareTask | null {
+    const resolvedId = resolveTaskUuid(taskId);
+    const taskIndex = this.tasks.findIndex(t => t.id === taskId || t.id === resolvedId || resolveTaskUuid(t.id) === resolvedId);
     if (taskIndex === -1) return null;
 
     const task = this.tasks[taskIndex];
@@ -418,7 +464,7 @@ export class MockCareLoopService {
       report: {
         ...task.report,
         verificationStatus: 'Verified',
-        verifiedBy: 'Nida Ali (Care Coordinator)',
+        verifiedBy: coordinatorName,
         verifiedAt: new Date().toISOString(),
         verificationNotes: notes || 'Verified side-by-side against original diagnostic laboratory report.',
         extractedResults: verifiedResults
@@ -468,7 +514,8 @@ export class MockCareLoopService {
 
   // 4. Coordinator Flags Report for Correction
   public flagReportForCorrection(taskId: string, reason: string): CareTask | null {
-    const taskIndex = this.tasks.findIndex(t => t.id === taskId);
+    const resolvedId = resolveTaskUuid(taskId);
+    const taskIndex = this.tasks.findIndex(t => t.id === taskId || t.id === resolvedId || resolveTaskUuid(t.id) === resolvedId);
     if (taskIndex === -1) return null;
 
     const task = this.tasks[taskIndex];
@@ -527,7 +574,8 @@ export class MockCareLoopService {
     nextAction: NextAction;
     followUpDate?: string;
   }): CareTask | null {
-    const taskIndex = this.tasks.findIndex(t => t.id === taskId);
+    const resolvedId = resolveTaskUuid(taskId);
+    const taskIndex = this.tasks.findIndex(t => t.id === taskId || t.id === resolvedId || resolveTaskUuid(t.id) === resolvedId);
     if (taskIndex === -1) return null;
 
     const task = this.tasks[taskIndex];
@@ -684,7 +732,8 @@ export class MockCareLoopService {
 
   // 6. Record Missed-Task Reason (Value-add feature from Page 6 & 7)
   public recordDelayReason(taskId: string, reason: DelayReason, notes: string): CareTask | null {
-    const taskIndex = this.tasks.findIndex(t => t.id === taskId);
+    const resolvedId = resolveTaskUuid(taskId);
+    const taskIndex = this.tasks.findIndex(t => t.id === taskId || t.id === resolvedId || resolveTaskUuid(t.id) === resolvedId);
     if (taskIndex === -1) return null;
 
     const updatedTask: CareTask = {
@@ -889,21 +938,15 @@ export class MockCareLoopService {
     this.tasks = [...INITIAL_TASKS];
     this.notifications = [...INITIAL_NOTIFICATIONS];
     this.auditLogs = [...INITIAL_AUDIT_LOGS];
-    try {
-      localStorage.removeItem('careloop_tasks');
-      localStorage.removeItem('careloop_careplans');
-      localStorage.removeItem('careloop_notifications');
-      localStorage.removeItem('careloop_auditlogs');
-      localStorage.removeItem('careloop_v2_tasks');
-      localStorage.removeItem('careloop_v2_careplans');
-      localStorage.removeItem('careloop_v2_notifications');
-      localStorage.removeItem('careloop_v2_auditlogs');
-      localStorage.removeItem('careloop_v2_patients');
-      localStorage.removeItem('careloop_v2_feedbacks');
-    } catch {
-      // ignore
-    }
     this.feedbacks = [...INITIAL_FEEDBACKS];
+
+    const keys = [
+      'careloop_tasks', 'careloop_careplans', 'careloop_notifications', 'careloop_auditlogs',
+      'careloop_v2_tasks', 'careloop_v2_careplans', 'careloop_v2_notifications',
+      'careloop_v2_auditlogs', 'careloop_v2_patients', 'careloop_v2_feedbacks'
+    ];
+    keys.forEach(k => safeRemoveItem(k));
+
     this.notify();
   }
 
@@ -944,8 +987,16 @@ export class MockCareLoopService {
 
   public getDoctorFeedbackQueue(doctorId?: string): PatientFeedback[] {
     if (!doctorId) return [...this.feedbacks];
-    const doctorPlanIds = new Set(this.carePlans.filter(cp => cp.doctorId === doctorId).map(cp => cp.id));
-    return this.feedbacks.filter(f => doctorPlanIds.has(f.carePlanId));
+    const resolvedDoctorId = resolveDoctorUuid(doctorId);
+    const doctorPlanIds = new Set(
+      this.carePlans
+        .filter(cp => cp.doctorId === doctorId || resolveDoctorUuid(cp.doctorId) === resolvedDoctorId)
+        .map(cp => cp.id)
+    );
+    return this.feedbacks.filter(f => 
+      doctorPlanIds.has(f.carePlanId) || 
+      doctorPlanIds.has(resolveCarePlanUuid(f.carePlanId))
+    );
   }
 
   public submitPatientFeedback(payload: SubmitFeedbackPayload): PatientFeedback {
@@ -967,12 +1018,6 @@ export class MockCareLoopService {
 
     // Determine patient ID from payload or fallback to plan's patient ID
     const patientId = payload.patientId || plan.patientId;
-
-    // Prevent duplicate submission for same care plan
-    const existing = this.feedbacks.find(f => f.carePlanId === payload.carePlanId || f.carePlanId === targetCarePlanId);
-    if (existing) {
-      throw new Error('Feedback has already been submitted for this care plan.');
-    }
 
     // Validate rating
     if (!payload.experienceRating || payload.experienceRating < 1 || payload.experienceRating > 5) {
@@ -998,6 +1043,12 @@ export class MockCareLoopService {
     const validBarriers = ['no_difficulties', 'none', 'cost', 'travel_or_access', 'side_effects', 'unclear_instructions', 'other'];
     if (!validBarriers.includes(payload.barrierType)) {
       throw new Error('Invalid barrier type value.');
+    }
+
+    // Prevent duplicate submission for same care plan
+    const existing = this.feedbacks.find(f => f.carePlanId === payload.carePlanId || f.carePlanId === targetCarePlanId);
+    if (existing) {
+      throw new Error('Feedback has already been submitted for this care plan.');
     }
 
     // Normalize adherence and barrier for storage consistency

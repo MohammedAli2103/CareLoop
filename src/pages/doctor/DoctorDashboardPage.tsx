@@ -54,6 +54,18 @@ export const DoctorDashboardPage: React.FC = () => {
     actions
   } = useCareLoop('doctor');
 
+  const doctorUser = React.useMemo(() => {
+    if (profile) {
+      return {
+        ...currentUser,
+        id: profile.id,
+        fullName: profile.full_name || currentUser.fullName,
+        email: profile.email || currentUser.email
+      };
+    }
+    return currentUser;
+  }, [profile, currentUser]);
+
   const handleCreatePlan = async (data: {
     patientId: string;
     doctorId: string;
@@ -67,7 +79,8 @@ export const DoctorDashboardPage: React.FC = () => {
     instructions: string;
   }) => {
     try {
-      const res = await actions.createCarePlan(data);
+      const doctorId = profile?.id || data.doctorId;
+      const res = await actions.createCarePlan({ ...data, doctorId });
       if (res && res.task) {
         addToast(
           'success',
@@ -88,7 +101,8 @@ export const DoctorDashboardPage: React.FC = () => {
     followUpDate?: string;
   }) => {
     try {
-      const updated = await actions.completeDoctorReview(taskId, data);
+      const doctorName = profile?.full_name || currentUser.fullName;
+      const updated = await actions.completeDoctorReview(taskId, { ...data, doctorName });
       if (updated) {
         addToast(
           'success',
@@ -189,7 +203,7 @@ export const DoctorDashboardPage: React.FC = () => {
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
         <DoctorDashboard
-          doctor={currentUser}
+          doctor={doctorUser}
           patients={patients}
           carePlans={carePlans}
           tasks={allTasks}
