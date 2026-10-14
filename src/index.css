@@ -1,0 +1,19 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --primary: #0284c7;
+    --primary-dark: #0369a1;
+  }
+  
+  body {
+    @apply bg-slate-50 text-slate-800 antialiased font-sans selection:bg-sky-100 selection:text-sky-900 min-h-screen;
+    margin: 0;
+  }
+
+  #root {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+}

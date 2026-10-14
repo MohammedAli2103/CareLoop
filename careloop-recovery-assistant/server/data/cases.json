@@ -1,0 +1,116 @@
+[
+  {
+    "id": "case-1791916575878",
+    "reason": "Transport difficulties",
+    "createdAt": "2026-10-13T18:36:15.878Z",
+    "status": "staff_follow_up"
+  },
+  {
+    "id": "case-1791925619356-bbiuz",
+    "reason": "Cost concerns",
+    "createdAt": "2026-10-13T21:06:59.356Z",
+    "status": "staff_follow_up"
+  },
+  {
+    "id": "case-1791926172033-6b8o3",
+    "reason": "I forgot",
+    "createdAt": "2026-10-13T21:16:12.033Z",
+    "status": "awaiting_patient"
+  },
+  {
+    "id": "case-1791927516405-sw6zs",
+    "reason": "I wasn't feeling well",
+    "createdAt": "2026-10-13T21:38:36.405Z",
+    "status": "rebooked",
+    "appointment": {
+      "slotId": "slot-6",
+      "date": "2026-11-03",
+      "time": "03:00 PM",
+      "bookedAt": "2026-10-13T21:39:04.514Z"
+    }
+  },
+  {
+    "id": "case-1791927621328-rl81f",
+    "reason": "Transport difficulties",
+    "createdAt": "2026-10-13T21:40:21.329Z",
+    "status": "awaiting_patient"
+  },
+  {
+    "id": "case-1791927848452-t01yw",
+    "reason": "Scheduling conflict",
+    "createdAt": "2026-10-13T21:44:08.452Z",
+    "status": "awaiting_patient"
+  },
+  {
+    "id": "case-1791927971512-tqhcx",
+    "reason": "Cost concerns",
+    "createdAt": "2026-10-13T21:46:11.512Z",
+    "status": "rebooked",
+    "appointment": {
+      "slotId": "slot-5",
+      "date": "2026-11-03",
+      "time": "11:00 AM",
+      "bookedAt": "2026-10-13T21:47:10.513Z"
+    }
+  },
+  {
+    "id": "case-1791928687294-9guvw",
+    "reason": "Cost concerns",
+    "createdAt": "2026-10-13T21:58:07.294Z",
+    "status": "awaiting_patient"
+  },
+  {
+    "id": "case-1791928912383-9k0gl",
+    "reason": "I wasn't feeling well",
+    "createdAt": "2026-10-13T22:01:52.383Z",
+    "status": "awaiting_patient"
+  },
+  {
+    "id": "case-1791929060581-y286t",
+    "reason": "Transport difficulties",
+    "createdAt": "2026-10-13T22:04:20.581Z",
+    "status": "awaiting_patient"
+  },
+  {
+    "id": "case-1791929595998-5wg1g",
+    "reason": "Cost concerns",
+    "createdAt": "2026-10-13T22:13:15.998Z",
+    "status": "closed",
+    "appointment": {
+      "slotId": "slot-4",
+      "date": "2026-11-03",
+      "time": "09:30 AM",
+      "bookedAt": "2026-10-13T22:13:27.481Z"
+    }
+  },
+  {
+    "id": "case-1791930142603-acg8g",
+    "reason": "I forgot",
+    "createdAt": "2026-10-13T22:22:22.603Z",
+    "status": "rebooked",
+    "appointment": {
+      "slotId": "slot-7",
+      "date": "2026-11-04",
+      "time": "10:00 AM",
+      "bookedAt": "2026-10-13T22:22:33.628Z"
+    }
+  },
+  {
+    "id": "case-1791930442492-i7nci",
+    "reason": "Prefer not to say",
+    "createdAt": "2026-10-13T22:27:22.492Z",
+    "status": "awaiting_patient"
+  },
+  {
+    "id": "case-1791932567504-xe8jo",
+    "reason": "Scheduling conflict",
+    "createdAt": "2026-10-13T23:02:47.504Z",
+    "status": "rebooked",
+    "appointment": {
+      "slotId": "slot-3",
+      "date": "2026-11-02",
+      "time": "02:00 PM",
+      "bookedAt": "2026-10-13T23:32:26.403Z"
+    }
+  }
+]
